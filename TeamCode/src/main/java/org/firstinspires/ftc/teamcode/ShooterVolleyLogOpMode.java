@@ -25,7 +25,7 @@ import java.util.Locale;
  * - D-pad Up / Down: Feedforward trim +/- 0.02 (starts at 1.464, last year's 1.20 x 1.22)
  * - Right Bumper / Left Bumper: P +/- 25
  * - A: Start a recording window (4 s). Then pull the right trigger to release the balls.
- * - Right Trigger: Move the gate servo (0.0 to 1.0)
+ * - Right Trigger: Gate open while held, closed when released
  *
  * While idle, the battery-voltage correction on the feedforward is refreshed about once a second,
  * and only when the smoothed voltage has moved by 0.15 V or more. It is frozen while recording and
@@ -43,7 +43,6 @@ public class ShooterVolleyLogOpMode extends LinearOpMode {
     // ---- Recording ----
     private static final int    RECORD_WINDOW_MS = 4000;
     private static final int    MAX_SAMPLES      = 20000;
-    private static final double GATE_OPEN_THRESHOLD = 0.05;
     private static final double PRE_WINDOW_MS    = 150.0;
     private static final String LOG_DIR          = "/sdcard/FIRST/ShooterLogs";
 
@@ -119,7 +118,7 @@ public class ShooterVolleyLogOpMode extends LinearOpMode {
         long readySinceMs = -1;
 
         double lastCmdRpm = -1;
-        double lastServoCmd = 0.0;
+        double lastServoCmd = BiobuzzConstants.GATE_CLOSED_POSITION;
 
         while (opModeIsActive()) {
             for (LynxModule hub : hubs) {
@@ -129,13 +128,15 @@ public class ShooterVolleyLogOpMode extends LinearOpMode {
             long nowMs = nowNs / 1000000L;
 
             // --- Gate servo (only send when the value actually changes) ---
-            double trigger = gamepad1.right_trigger;
-            if (trigger > GATE_OPEN_THRESHOLD) {
+            boolean gateOpen = gamepad1.right_trigger > BiobuzzConstants.GATE_TRIGGER_THRESHOLD;
+            if (gateOpen) {
                 lastGateActiveMs = nowMs;
             }
-            if (Math.abs(trigger - lastServoCmd) > 0.004 || (trigger == 0.0 && lastServoCmd != 0.0)) {
-                robot.shooter_trigger(trigger);
-                lastServoCmd = trigger;
+            double gateCmd = gateOpen ? BiobuzzConstants.GATE_OPEN_POSITION
+                                      : BiobuzzConstants.GATE_CLOSED_POSITION;
+            if (gateCmd != lastServoCmd) {
+                robot.shooter_trigger(gateCmd);
+                lastServoCmd = gateCmd;
             }
 
             // --- Button edges ---
@@ -293,7 +294,9 @@ public class ShooterVolleyLogOpMode extends LinearOpMode {
 
         int gate = -1;
         for (int i = 0; i < sampleCount; i++) {
-            if (servoLog[i] >= GATE_OPEN_THRESHOLD) {
+            // Open when the logged servo position is nearer the open position than the closed one
+            if (Math.abs(servoLog[i] - BiobuzzConstants.GATE_OPEN_POSITION)
+                    < Math.abs(servoLog[i] - BiobuzzConstants.GATE_CLOSED_POSITION)) {
                 gate = i;
                 break;
             }

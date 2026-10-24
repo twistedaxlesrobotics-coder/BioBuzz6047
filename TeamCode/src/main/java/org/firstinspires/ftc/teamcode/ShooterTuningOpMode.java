@@ -10,7 +10,7 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
  * - B: Stop motor (set RPM to 0)
  * - D-pad Right: Increase target RPM by 25
  * - D-pad Left: Decrease target RPM by 25
- * - Right Trigger: Move shooter trigger servo (0.0 to 1.0)
+ * - Right Trigger: Gate open while held, closed when released
  */
 @TeleOp(name="Shooter Tuning", group="Shooter")
 public class ShooterTuningOpMode extends LinearOpMode {
@@ -65,8 +65,8 @@ public class ShooterTuningOpMode extends LinearOpMode {
             }
 
             // --- Shooter Trigger Control ---
-            // Maps the analog trigger value (0.0 - 1.0) directly to the servo position
-            robot.shooter_trigger(gamepad1.right_trigger);
+            // Gate is open while the right trigger is held past the threshold, closed otherwise
+            robot.setGate(gamepad1.right_trigger > BiobuzzConstants.GATE_TRIGGER_THRESHOLD);
 
             // --- Motor Output ---
 

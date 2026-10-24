@@ -98,6 +98,10 @@ public class BiobuzzTankDrive extends LinearOpMode {
                 robot.intakeMotor.setPower(0.0);
             }
 
+            // --- Gate Servo (Right Trigger) ---
+            // Gate is open while the trigger is held, and closes when it is released
+            robot.setGate(gamepad1.right_trigger > BiobuzzConstants.GATE_TRIGGER_THRESHOLD);
+
             // --- Shooter Control (mimicking Decode behavior) ---
             if (gamepad1.x) {
                 targetPreset = BiobuzzConstants.ShooterPreset.CLOSE;

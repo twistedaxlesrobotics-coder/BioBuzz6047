@@ -27,6 +27,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
  *
  * Controls (gamepad 1):
  * - Left stick Y / Right stick Y: tank drive
+ * - Right Trigger: Gate open while held, closed when released
  * - Y: Reset the pose to (0, 0, heading 0)
  * - X: Recalibrate the OTOS gyro (keep the robot completely still)
  */
@@ -87,6 +88,9 @@ public class OtosCheckOpMode extends LinearOpMode {
             double left = -gamepad1.left_stick_y;
             double right = -gamepad1.right_stick_y;
             robot.setDrivePower(left, left, right, right);
+
+            // Gate is open while the right trigger is held, and closes when it is released
+            robot.setGate(gamepad1.right_trigger > BiobuzzConstants.GATE_TRIGGER_THRESHOLD);
 
             drive.update();
 

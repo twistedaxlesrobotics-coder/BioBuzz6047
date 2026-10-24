@@ -31,4 +31,17 @@ public class BiobuzzConstants {
 
     /** How close (in RPM) the wheel must be to its target to count as "at speed". */
     public static final double SHOOTER_RPM_TOLERANCE = 75.0;
+
+    // =========================================================
+    //  GATE SERVO (ON/OFF)
+    // =========================================================
+
+    /** Servo position with the gate closed (balls held back). */
+    public static final double GATE_CLOSED_POSITION = 0.0;
+
+    /** Servo position with the gate open (balls released). Set this to match the robot. */
+    public static final double GATE_OPEN_POSITION = 1.0;
+
+    /** The right trigger must be pulled past this (0 to 1) to open the gate. */
+    public static final double GATE_TRIGGER_THRESHOLD = 0.5;
 }

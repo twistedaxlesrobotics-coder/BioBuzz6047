@@ -69,7 +69,7 @@ public class BiobuzzHardware {
         shooterMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
 
         // Servo Initial Position
-        if (triggerServo != null) triggerServo.setPosition(0);
+        if (triggerServo != null) triggerServo.setPosition(BiobuzzConstants.GATE_CLOSED_POSITION);
 
         // Reset all
         setDrivePower(0, 0, 0, 0);
@@ -108,6 +108,14 @@ public class BiobuzzHardware {
         if (triggerServo != null) {
             triggerServo.setPosition(position);
         }
+    }
+
+    /**
+     * setGate
+     * On/off gate control: moves the servo to the open or closed position from BiobuzzConstants.
+     */
+    public void setGate(boolean open) {
+        shooter_trigger(open ? BiobuzzConstants.GATE_OPEN_POSITION : BiobuzzConstants.GATE_CLOSED_POSITION);
     }
 
     public void applyShooterPIDFWithVoltageComp() {
