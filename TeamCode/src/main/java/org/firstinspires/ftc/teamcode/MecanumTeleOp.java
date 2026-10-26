@@ -1,35 +1,28 @@
 package org.firstinspires.ftc.teamcode;
 
-import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
-import com.qualcomm.robotcore.hardware.IMU;
-
-import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 
 /**
- * Mecanum drive for the BioBuzz practice bot.
+ * Mecanum drive for the BioBuzz practice bot. Drive controls match TeleopBlue.
  *
- * Controls (gamepad1):
- *   Left stick  - drive / strafe
- *   Right stick - rotate
- *   Right bumper (hold) - slow mode
- *   Options / Start     - reset field-centric heading
- *   Y - toggle field-centric / robot-centric
+ * Driver controls (gamepad1):
+ *  - Left stick: drive / strafe
+ *  - Right stick X: rotate
+ *  - Right trigger: slow mode
+ *  - A: toggle drive direction
  *
- * Hardware config names (set these in the Driver Hub configuration):
- *   frontLeft, frontRight, backLeft, backRight, imu
+ * Hardware config names: frontLeft, frontRight, backLeft, backRight
  */
 @TeleOp(name = "Mecanum Drive", group = "BioBuzz")
 public class MecanumTeleOp extends LinearOpMode {
 
     private DcMotor frontLeft, frontRight, backLeft, backRight;
-    private IMU imu;
 
-    private static final double SLOW_MODE_SCALE = 0.35;
-    private static final double STRAFE_CORRECTION = 1.1; // compensates for imperfect strafing
+    private boolean driveReversed = false;
+    private boolean prevToggleA1 = false;
 
     @Override
     public void runOpMode() {
@@ -38,8 +31,7 @@ public class MecanumTeleOp extends LinearOpMode {
         backLeft   = hardwareMap.get(DcMotor.class, "backLeft");
         backRight  = hardwareMap.get(DcMotor.class, "backRight");
 
-        // Motors on the left side face the opposite way, so reverse them.
-        // If the robot drives backwards, swap FORWARD/REVERSE on all four.
+        // Match these to DecodeRobotHardware so the practice bot behaves like the main bot.
         frontLeft.setDirection(DcMotorSimple.Direction.REVERSE);
         backLeft.setDirection(DcMotorSimple.Direction.REVERSE);
         frontRight.setDirection(DcMotorSimple.Direction.FORWARD);
@@ -50,59 +42,51 @@ public class MecanumTeleOp extends LinearOpMode {
             m.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         }
 
-        // Set these to match how the Control Hub is physically mounted.
-        imu = hardwareMap.get(IMU.class, "imu");
-        imu.initialize(new IMU.Parameters(new RevHubOrientationOnRobot(
-                RevHubOrientationOnRobot.LogoFacingDirection.UP,
-                RevHubOrientationOnRobot.UsbFacingDirection.FORWARD)));
-
-        boolean fieldCentric = false;
-        boolean yWasPressed = false;
-
-        telemetry.addLine("Ready. Press START.");
+        telemetry.addLine("Mecanum Drive ready.");
         telemetry.update();
         waitForStart();
 
         while (opModeIsActive()) {
-            double y  = -gamepad1.left_stick_y;  // up on stick is negative
-            double x  = gamepad1.left_stick_x * STRAFE_CORRECTION;
-            double rx = gamepad1.right_stick_x;
+            boolean a1 = gamepad1.a;
+            if (a1 && !prevToggleA1) {
+                driveReversed = !driveReversed;
+                if (driveReversed) gamepad1.rumble(1.0, 1.0, 300);
+                else gamepad1.rumble(0.4, 0.4, 150);
+            }
+            prevToggleA1 = a1;
 
-            if (gamepad1.options) {
-                imu.resetYaw();
+            double drive  = -gamepad1.left_stick_y;
+            double strafe =  gamepad1.left_stick_x;
+            double rotate =  gamepad1.right_stick_x;
+
+            if (driveReversed) {
+                drive  = -drive;
+                strafe = -strafe;
             }
 
-            if (gamepad1.y && !yWasPressed) {
-                fieldCentric = !fieldCentric;
-            }
-            yWasPressed = gamepad1.y;
+            double speedModifier = 0.7 - (0.6 * gamepad1.right_trigger);
 
-            if (fieldCentric) {
-                double heading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
-                double rotX = x * Math.cos(-heading) - y * Math.sin(-heading);
-                double rotY = x * Math.sin(-heading) + y * Math.cos(-heading);
-                x = rotX;
-                y = rotY;
-            }
+            double fl = (drive + strafe + rotate) * speedModifier;
+            double fr = (drive - strafe - rotate) * speedModifier;
+            double bl = (drive - strafe + rotate) * speedModifier;
+            double br = (drive + strafe - rotate) * speedModifier;
 
-            // Scale so no wheel exceeds 1.0 while keeping the ratios between wheels.
-            double denominator = Math.max(Math.abs(y) + Math.abs(x) + Math.abs(rx), 1.0);
-            double fl = (y + x + rx) / denominator;
-            double bl = (y - x + rx) / denominator;
-            double fr = (y - x - rx) / denominator;
-            double br = (y + x - rx) / denominator;
+            double maxMag = Math.max(1.0,
+                    Math.max(Math.abs(fl), Math.max(Math.abs(fr), Math.max(Math.abs(bl), Math.abs(br)))));
 
-            double scale = gamepad1.right_bumper ? SLOW_MODE_SCALE : 1.0;
-            frontLeft.setPower(fl * scale);
-            backLeft.setPower(bl * scale);
-            frontRight.setPower(fr * scale);
-            backRight.setPower(br * scale);
+            frontLeft.setPower(fl / maxMag);
+            frontRight.setPower(fr / maxMag);
+            backLeft.setPower(bl / maxMag);
+            backRight.setPower(br / maxMag);
 
-            telemetry.addData("Mode", fieldCentric ? "Field-centric" : "Robot-centric");
-            telemetry.addData("Slow mode", gamepad1.right_bumper);
-            telemetry.addData("FL/FR", "%.2f / %.2f", fl * scale, fr * scale);
-            telemetry.addData("BL/BR", "%.2f / %.2f", bl * scale, br * scale);
+            telemetry.addData("Drive Dir", driveReversed ? "REVERSED" : "NORMAL");
+            telemetry.addData("Speed modifier", "%.2f", speedModifier);
             telemetry.update();
         }
+
+        frontLeft.setPower(0);
+        frontRight.setPower(0);
+        backLeft.setPower(0);
+        backRight.setPower(0);
     }
 }
