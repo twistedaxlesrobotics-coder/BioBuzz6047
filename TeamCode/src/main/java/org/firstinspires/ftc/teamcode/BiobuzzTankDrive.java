@@ -91,19 +91,19 @@ public class BiobuzzTankDrive extends LinearOpMode {
 
             // --- Intake Control (Gamepad 2) ---
 
-            if (gamepad2.right_bumper) {
+            if (gamepad2.left_bumper) {
                 robot.intakeMotor.setPower(1.0);
-            } else if (gamepad2.left_bumper) {
+            } else if (gamepad2.right_bumper) {
                 robot.intakeMotor.setPower(-1.0);
             } else {
                 robot.intakeMotor.setPower(0.0);
             }
 
 
-            // --- Gate Servo Control (Gamepad 2 Right Trigger) ---
+            // --- Gate Servo Control (Gamepad 1 Right Trigger) ---
 
             // Open the gate while the trigger exceeds the threshold
-            if (gamepad2.right_trigger
+            if (gamepad1.right_trigger
                     > BiobuzzConstants.GATE_TRIGGER_THRESHOLD) {
 
                 robot.setGate(true);
@@ -116,16 +116,14 @@ public class BiobuzzTankDrive extends LinearOpMode {
 
             // --- Shooter Control ---
 
-            // Select CLOSE when Gamepad 1 right trigger is pressed
-            if (gamepad1.right_trigger
-                    > BiobuzzConstants.GATE_TRIGGER_THRESHOLD) {
+            // Start the shooter (CLOSE) on Gamepad 1 D-pad up
+            if (gamepad1.dpad_up) {
 
                 targetPreset = BiobuzzConstants.ShooterPreset.CLOSE;
 
-            } else if (gamepad2.left_trigger
-                    > BiobuzzConstants.GATE_TRIGGER_THRESHOLD) {
+            } else if (gamepad1.dpad_down) {
 
-                // Select STOP when Gamepad 2 left trigger is pressed
+                // Stop the shooter on Gamepad 1 D-pad down
                 targetPreset = BiobuzzConstants.ShooterPreset.STOP;
             }
 

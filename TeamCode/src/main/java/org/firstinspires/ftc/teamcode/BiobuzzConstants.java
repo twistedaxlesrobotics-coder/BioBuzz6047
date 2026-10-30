@@ -33,10 +33,10 @@ public class BiobuzzConstants {
     // =========================================================
 
     /** Servo position with the gate closed (balls held back). */
-    public static final double GATE_CLOSED_POSITION = 0.0;
+    public static final double GATE_CLOSED_POSITION = 1.0;
 
     /** Servo position with the gate open (balls released). Set this to match the robot. */
-    public static final double GATE_OPEN_POSITION = 1.0;
+    public static final double GATE_OPEN_POSITION = 0.0;
 
     /** The right trigger must be pulled past this (0 to 1) to open the gate. */
     public static final double GATE_TRIGGER_THRESHOLD = 0.5;
