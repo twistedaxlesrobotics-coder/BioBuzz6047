@@ -10,11 +10,9 @@ public class BiobuzzConstants {
     //  SHOOTER (SPEEDS + TOLERANCES)
     // =========================================================
 
-    public enum ShooterPreset { STOP, CLOSE, MID, STEPH }
+    public enum ShooterPreset { STOP, CLOSE, }
 
     // Preset RPM values (mimicking last year's top motor speeds)
-    public static final double RPM_STEPH = 1450.0;
-    public static final double RPM_MID   = 1350.0;
     public static final double RPM_CLOSE = 2500.0;
 
     /**
@@ -23,8 +21,6 @@ public class BiobuzzConstants {
     public static double getTargetRpm(ShooterPreset preset) {
         switch (preset) {
             case CLOSE: return RPM_CLOSE;
-            case MID:   return RPM_MID;
-            case STEPH: return RPM_STEPH;
             default:    return 0.0;
         }
     }

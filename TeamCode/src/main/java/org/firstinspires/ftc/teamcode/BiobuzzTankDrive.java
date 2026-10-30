@@ -1,131 +1,188 @@
+
 package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
-@TeleOp(name="Biobuzz Tank Drive", group="Linear Opmode")
+@TeleOp(name = "Biobuzz Arcade Drive", group = "Linear Opmode")
 public class BiobuzzTankDrive extends LinearOpMode {
 
-    // Declare OpMode members
+    // Declare robot hardware
     BiobuzzHardware robot = new BiobuzzHardware();
-    
-    // Shooter state
-    BiobuzzConstants.ShooterPreset targetPreset = BiobuzzConstants.ShooterPreset.STOP;
 
-    // Drive state variables
-    boolean isArcadeMode = false;
+    // Shooter state
+    BiobuzzConstants.ShooterPreset targetPreset =
+            BiobuzzConstants.ShooterPreset.STOP;
+
+    // Drive state
     boolean isReversed = false;
 
-    // Button state for toggling
-    boolean prevDpadLeft = false;
+    // Button state for detecting D-pad presses
     boolean prevDpadRight = false;
 
     @Override
     public void runOpMode() {
-        // Initialize the hardware
+
+        // Initialize robot hardware
         robot.init(hardwareMap);
 
         telemetry.addData("Status", "Initialized");
+        telemetry.addData("Drive Mode", "Arcade");
         telemetry.update();
 
-        // Wait for the game to start (driver presses PLAY)
+        // Wait for the driver to press PLAY
         waitForStart();
 
-        // Run until the end of the match (driver presses STOP)
+        // Main robot control loop
         while (opModeIsActive()) {
 
-            // --- Toggle Logic ---
+            // --- Toggle Front/Back Orientation (D-pad Right) ---
 
-            // Toggle between Tank and Split Arcade (D-pad Left)
-            if (gamepad1.dpad_left && !prevDpadLeft) {
-                isArcadeMode = !isArcadeMode;
-            }
-            prevDpadLeft = gamepad1.dpad_left;
-
-            // Toggle Front/Back orientation (D-pad Right)
             if (gamepad1.dpad_right && !prevDpadRight) {
                 isReversed = !isReversed;
             }
+
             prevDpadRight = gamepad1.dpad_right;
 
-            // --- Power Calculation ---
 
-            double leftPower;
-            double rightPower;
+            // --- Arcade Drive Power Calculation ---
+
             double driveScale = 1.0;
 
-            // Slow mode check (Left Trigger)
+            // Slow mode: hold Gamepad 1 left trigger
             if (gamepad1.left_trigger > 0.1) {
                 driveScale = 0.25;
             }
 
-            if (isArcadeMode) {
-                // Split Arcade Mode: Left stick Y is forward/back, Right stick X is turning
-                double drive = -gamepad1.left_stick_y;
-                double turn = gamepad1.right_stick_x;
-                if (isReversed) drive *= -1;
-                leftPower = (drive + turn) * driveScale;
-                rightPower = (drive - turn) * driveScale;
-            } else {
-                // Regular Tank Drive: Left stick Y is left side, Right stick Y is right side
-                double left = -gamepad1.left_stick_y;
-                double right = -gamepad1.right_stick_y;
-                if (isReversed) {
-                    leftPower = -right * driveScale;
-                    rightPower = -left * driveScale;
-                } else {
-                    leftPower = left * driveScale;
-                    rightPower = right * driveScale;
-                }
+            // Left stick Y controls forward/backward
+            double drive = -gamepad1.left_stick_y;
+
+            // Right stick X controls turning
+            double turn = gamepad1.right_stick_x;
+
+            // Reverse driving direction if enabled
+            if (isReversed) {
+                drive *= -1;
             }
 
-            // Normalize powers if they exceed 1.0
-            double max = Math.max(Math.abs(leftPower), Math.abs(rightPower));
+            // Combine forward movement and turning
+            double leftPower = (drive + turn) * driveScale;
+            double rightPower = (drive - turn) * driveScale;
+
+            // Normalize powers if either side exceeds 1.0
+            double max = Math.max(
+                    Math.abs(leftPower),
+                    Math.abs(rightPower)
+            );
+
             if (max > 1.0) {
                 leftPower /= max;
                 rightPower /= max;
             }
 
-            // Output to drivetrain motors
-            robot.setDrivePower(leftPower, leftPower, rightPower, rightPower);
+            // Send power to the drivetrain motors
+            robot.setDrivePower(
+                    leftPower,
+                    leftPower,
+                    rightPower,
+                    rightPower
+            );
 
-            // --- Intake Control ---
-            if (gamepad1.b) {
+
+            // --- Intake Control (Gamepad 2) ---
+
+            if (gamepad2.right_bumper) {
                 robot.intakeMotor.setPower(1.0);
-            } else if (gamepad1.y) {
+            } else if (gamepad2.left_bumper) {
                 robot.intakeMotor.setPower(-1.0);
             } else {
                 robot.intakeMotor.setPower(0.0);
             }
 
-            // --- Gate Servo (Right Trigger) ---
-            // Gate is open while the trigger is held, and closes when it is released
-            robot.setGate(gamepad1.right_trigger > BiobuzzConstants.GATE_TRIGGER_THRESHOLD);
 
-            // --- Shooter Control (mimicking Decode behavior) ---
-            if (gamepad1.x) {
+            // --- Gate Servo Control (Gamepad 2 Right Trigger) ---
+
+            // Open the gate while the trigger exceeds the threshold
+            if (gamepad2.right_trigger
+                    > BiobuzzConstants.GATE_TRIGGER_THRESHOLD) {
+
+                robot.setGate(true);
+
+            } else {
+                // Close the gate when the trigger is released
+                robot.setGate(false);
+            }
+
+
+            // --- Shooter Control ---
+
+            // Select CLOSE when Gamepad 1 right trigger is pressed
+            if (gamepad1.right_trigger
+                    > BiobuzzConstants.GATE_TRIGGER_THRESHOLD) {
+
                 targetPreset = BiobuzzConstants.ShooterPreset.CLOSE;
-            } else if (gamepad1.a) {
-                targetPreset = BiobuzzConstants.ShooterPreset.MID;
-            } else if (gamepad1.left_bumper) {
+
+            } else if (gamepad2.left_trigger
+                    > BiobuzzConstants.GATE_TRIGGER_THRESHOLD) {
+
+                // Select STOP when Gamepad 2 left trigger is pressed
                 targetPreset = BiobuzzConstants.ShooterPreset.STOP;
             }
 
-            double targetRpm = BiobuzzConstants.getTargetRpm(targetPreset);
+
+            // --- Shooter Motor Control ---
+
+            double targetRpm =
+                    BiobuzzConstants.getTargetRpm(targetPreset);
+
             robot.setShooterWheelRpm(targetRpm);
-            
-            // Periodically apply voltage comp to maintain steady RPM as battery drops
+
+            // Apply voltage compensation to shooter PIDF
             robot.applyShooterPIDFWithVoltageComp();
 
-            // Telemetry
-            telemetry.addData("Drive Mode", isArcadeMode ? "Split Arcade" : "Regular Tank");
-            telemetry.addData("Orientation", isReversed ? "REVERSED" : "NORMAL");
-            telemetry.addData("Slow Mode", driveScale < 1.0 ? "ON" : "OFF");
-            telemetry.addData("Intake Status", robot.intakeMotor.getPower() != 0 ? (robot.intakeMotor.getPower() > 0 ? "FORWARD" : "REVERSE") : "STOPPED");
+
+            // --- Telemetry ---
+
+            telemetry.addData("Drive Mode", "Arcade");
+            telemetry.addData(
+                    "Orientation",
+                    isReversed ? "REVERSED" : "NORMAL"
+            );
+            telemetry.addData(
+                    "Slow Mode",
+                    driveScale < 1.0 ? "ON" : "OFF"
+            );
+
+            telemetry.addData(
+                    "Intake Status",
+                    robot.intakeMotor.getPower() != 0
+                            ? (robot.intakeMotor.getPower() > 0
+                            ? "FORWARD" : "REVERSE")
+                            : "STOPPED"
+            );
+
+            telemetry.addData("Gate",
+                    gamepad2.right_trigger
+                            > BiobuzzConstants.GATE_TRIGGER_THRESHOLD
+                            ? "OPEN" : "CLOSED");
+
             telemetry.addData("Shooter Preset", targetPreset);
-            telemetry.addData("Shooter RPM", "Target: %.0f, Actual: %.0f", targetRpm, robot.getShooterWheelRpm());
-            // Fixed: Added SHOOTER_RPM_TOLERANCE argument to match BiobuzzHardware definition
-            telemetry.addData("Shooter Ready", robot.isShooterAtSpeed(targetRpm, BiobuzzConstants.SHOOTER_RPM_TOLERANCE) ? "READY" : "WAITING");
+
+            telemetry.addData(
+                    "Shooter RPM",
+                    "Target: %.0f, Actual: %.0f",
+                    targetRpm,
+                    robot.getShooterWheelRpm()
+            );
+
+            telemetry.addData(
+                    "Shooter Ready",
+                    robot.isShooterAtSpeed(
+                            targetRpm,
+                            BiobuzzConstants.SHOOTER_RPM_TOLERANCE
+                    ) ? "READY" : "WAITING"
+            );
+
             telemetry.update();
         }
     }
