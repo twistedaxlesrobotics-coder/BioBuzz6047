@@ -49,31 +49,85 @@ public class BiobuzzAutoDrive {
     public static final double OTOS_ANGULAR_SCALAR = 1.0;
 
     // =========================================================
-    //  DRIVING (starting values - tune on the robot)
+    //  DRIVING (starting values - tune on the robot; not final so OtosTuningOpMode can adjust them live)
     // =========================================================
-    public static final double DRIVE_MAX_POWER = 0.7;
-    public static final double DRIVE_MIN_POWER = 0.12;
+    public static double DRIVE_MAX_POWER = 0.7;
+    public static double DRIVE_MIN_POWER = 0.12;
     /** Power per inch remaining; slows the robot down as it nears the target. */
-    public static final double DRIVE_KP = 0.04;
-    public static final double DRIVE_TOLERANCE_IN = 0.5;
+    public static double DRIVE_KP = 0.04;
+    public static double DRIVE_TOLERANCE_IN = 0.5;
     /** Time to ramp from the minimum to the maximum power at the start of a move. */
-    public static final double DRIVE_RAMP_SEC = 0.3;
+    public static double DRIVE_RAMP_SEC = 0.3;
     /** Steering to hold the heading while driving: power per degree of error, and its limit. */
-    public static final double HOLD_KP = 0.02;
-    public static final double HOLD_MAX_CORR = 0.3;
+    public static double HOLD_KP = 0.02;
+    public static double HOLD_MAX_CORR = 0.3;
     public static final double DEFAULT_DRIVE_TIMEOUT_S = 5.0;
 
     // =========================================================
     //  TURNING (starting values - tune on the robot)
     // =========================================================
-    public static final double TURN_MAX_POWER = 0.6;
-    public static final double TURN_MIN_POWER = 0.12;
+    public static double TURN_MAX_POWER = 0.6;
+    public static double TURN_MIN_POWER = 0.12;
     /** Power per degree of error. */
-    public static final double TURN_KP = 0.012;
-    public static final double TURN_TOLERANCE_DEG = 1.5;
+    public static double TURN_KP = 0.012;
+    public static double TURN_TOLERANCE_DEG = 1.5;
     /** The heading must stay inside the tolerance this long before the turn counts as done. */
     public static final long TURN_SETTLE_MS = 150;
     public static final double DEFAULT_TURN_TIMEOUT_S = 3.0;
+
+    // =========================================================
+    //  DRIVING TO A POINT  (driveTo / driveToBackward)
+    // =========================================================
+    /** If the robot is pointed more than this far from the point, it stops and turns in place first. */
+    public static final double REAIM_TURN_DEG = 30.0;
+    /** Inside this distance the aim is frozen, so the bearing to the point cannot flip around. */
+    public static final double AIM_FREEZE_IN = 4.0;
+    /** The robot is blocked if it moves less than this far in the stall time, while commanding power. */
+    public static final double STALL_MIN_MOVE_IN = 1.0;
+    public static final long STALL_TIME_MS = 1000;
+    /** Stall detection is off this close to the point, where the robot is crawling at minimum power. */
+    public static final double STALL_IGNORE_IN = 6.0;
+
+    /**
+     * Optional speed settings for a single move. Anything left out uses the defaults above
+     * (DRIVE_MAX_POWER, DRIVE_RAMP_SEC, TURN_MAX_POWER), so the defaults can still be tuned in one place.
+     *
+     * <pre>
+     *   drive.driveToBackward(47, 10, 8.0, BiobuzzAutoDrive.MoveSpeed.of(0.4));        // slower
+     *   drive.driveToBackward(47, 10, 8.0, BiobuzzAutoDrive.MoveSpeed.of(0.4, 0.6));   // slower, gentler start
+     * </pre>
+     *
+     * The ramp time applies to driving only; turns have no start ramp.
+     */
+    public static class MoveSpeed {
+        private final double maxPower;
+        private final double rampSec;
+
+        private MoveSpeed(double maxPower, double rampSec) {
+            this.maxPower = maxPower;
+            this.rampSec = rampSec;
+        }
+
+        /** Top power for the move, 0 to 1. */
+        public static MoveSpeed of(double maxPower) {
+            return new MoveSpeed(maxPower, Double.NaN);
+        }
+
+        /** Top power for the move, 0 to 1, and the seconds to ramp up to it at the start. */
+        public static MoveSpeed of(double maxPower, double rampSec) {
+            return new MoveSpeed(maxPower, rampSec);
+        }
+
+        double power(double fallback, double minPower) {
+            double p = Double.isNaN(maxPower) ? fallback : maxPower;
+            return Math.max(minPower, Math.min(1.0, p));
+        }
+
+        double ramp(double fallback) {
+            double r = Double.isNaN(rampSec) ? fallback : rampSec;
+            return Math.max(0.01, r);
+        }
+    }
 
     private final LinearOpMode opMode;
     private final BiobuzzHardware robot;
@@ -102,12 +156,7 @@ public class BiobuzzAutoDrive {
      * (about a second).
      */
     public void init() {
-        otos = opMode.hardwareMap.get(SparkFunOTOS.class, OTOS_NAME);
-        otos.setLinearUnit(DistanceUnit.INCH);
-        otos.setAngularUnit(AngleUnit.DEGREES);
-        otos.setOffset(new SparkFunOTOS.Pose2D(OTOS_OFFSET_X, OTOS_OFFSET_Y, OTOS_OFFSET_H));
-        otos.setLinearScalar(OTOS_LINEAR_SCALAR);
-        otos.setAngularScalar(OTOS_ANGULAR_SCALAR);
+        initWithoutCalibration();
 
         opMode.telemetry.addLine("Calibrating OTOS - do not move the robot");
         opMode.telemetry.update();
@@ -115,6 +164,20 @@ public class BiobuzzAutoDrive {
         otos.resetTracking();
         otos.setPosition(new SparkFunOTOS.Pose2D(0, 0, 0));
         update();
+    }
+
+    /**
+     * Configures the OTOS without calibrating the gyro or clearing its tracking. Use this in
+     * teleop, where the robot may be moving or the sensor is already tracking. Call
+     * setStartPose() afterward to set the pose.
+     */
+    public void initWithoutCalibration() {
+        otos = opMode.hardwareMap.get(SparkFunOTOS.class, OTOS_NAME);
+        otos.setLinearUnit(DistanceUnit.INCH);
+        otos.setAngularUnit(AngleUnit.DEGREES);
+        otos.setOffset(new SparkFunOTOS.Pose2D(OTOS_OFFSET_X, OTOS_OFFSET_Y, OTOS_OFFSET_H));
+        otos.setLinearScalar(OTOS_LINEAR_SCALAR);
+        otos.setAngularScalar(OTOS_ANGULAR_SCALAR);
     }
 
     /**
@@ -160,34 +223,182 @@ public class BiobuzzAutoDrive {
     // =========================================================
 
     public boolean driveForward(double inches) {
-        return driveDistance(Math.abs(inches), DEFAULT_DRIVE_TIMEOUT_S);
+        return driveDistance(Math.abs(inches), DEFAULT_DRIVE_TIMEOUT_S, null);
     }
 
     public boolean driveForward(double inches, double timeoutSeconds) {
-        return driveDistance(Math.abs(inches), timeoutSeconds);
+        return driveDistance(Math.abs(inches), timeoutSeconds, null);
+    }
+
+    public boolean driveForward(double inches, double timeoutSeconds, MoveSpeed speed) {
+        return driveDistance(Math.abs(inches), timeoutSeconds, speed);
     }
 
     public boolean driveBackward(double inches) {
-        return driveDistance(-Math.abs(inches), DEFAULT_DRIVE_TIMEOUT_S);
+        return driveDistance(-Math.abs(inches), DEFAULT_DRIVE_TIMEOUT_S, null);
     }
 
     public boolean driveBackward(double inches, double timeoutSeconds) {
-        return driveDistance(-Math.abs(inches), timeoutSeconds);
+        return driveDistance(-Math.abs(inches), timeoutSeconds, null);
+    }
+
+    public boolean driveBackward(double inches, double timeoutSeconds, MoveSpeed speed) {
+        return driveDistance(-Math.abs(inches), timeoutSeconds, speed);
     }
 
     public boolean turnToHeading(double degrees) {
-        return turn(degrees, DEFAULT_TURN_TIMEOUT_S);
+        return turn(degrees, DEFAULT_TURN_TIMEOUT_S, null);
     }
 
     public boolean turnToHeading(double degrees, double timeoutSeconds) {
-        return turn(degrees, timeoutSeconds);
+        return turn(degrees, timeoutSeconds, null);
+    }
+
+    public boolean turnToHeading(double degrees, double timeoutSeconds, MoveSpeed speed) {
+        return turn(degrees, timeoutSeconds, speed);
+    }
+
+    /**
+     * Drives to a point on the field. The robot turns in place if it is pointed far from the
+     * point, then drives toward it, re-aiming from the live pose as it goes. If it is knocked off
+     * course it arcs back toward the point. Returns false if it was blocked, timed out, or lost
+     * its way; the caller can continue, and the next move aims from wherever the robot ended up.
+     */
+    public boolean driveTo(double xInches, double yInches) {
+        return driveToPoint(xInches, yInches, false, DEFAULT_DRIVE_TIMEOUT_S, null);
+    }
+
+    public boolean driveTo(double xInches, double yInches, double timeoutSeconds) {
+        return driveToPoint(xInches, yInches, false, timeoutSeconds, null);
+    }
+
+    public boolean driveTo(double xInches, double yInches, double timeoutSeconds, MoveSpeed speed) {
+        return driveToPoint(xInches, yInches, false, timeoutSeconds, speed);
+    }
+
+    /** Same as driveTo, but the robot drives in reverse (its back faces the point). */
+    public boolean driveToBackward(double xInches, double yInches) {
+        return driveToPoint(xInches, yInches, true, DEFAULT_DRIVE_TIMEOUT_S, null);
+    }
+
+    public boolean driveToBackward(double xInches, double yInches, double timeoutSeconds) {
+        return driveToPoint(xInches, yInches, true, timeoutSeconds, null);
+    }
+
+    public boolean driveToBackward(double xInches, double yInches, double timeoutSeconds, MoveSpeed speed) {
+        return driveToPoint(xInches, yInches, true, timeoutSeconds, speed);
     }
 
     public void stop() {
         robot.setDrivePower(0, 0, 0, 0);
     }
 
-    private boolean driveDistance(double signedInches, double timeoutSeconds) {
+    private boolean driveToPoint(double targetX, double targetY, boolean backward, double timeoutSeconds,
+                                 MoveSpeed speed) {
+        update();
+        if (Math.hypot(targetX - x, targetY - y) <= DRIVE_TOLERANCE_IN) {
+            return true;
+        }
+
+        double maxPower = speed == null ? DRIVE_MAX_POWER : speed.power(DRIVE_MAX_POWER, DRIVE_MIN_POWER);
+        double rampSec = speed == null ? DRIVE_RAMP_SEC : speed.ramp(DRIVE_RAMP_SEC);
+
+        long startNs = System.nanoTime();
+        long rampStartNs = startNs;
+        double desired = aimHeading(targetX, targetY, backward);
+        double minDistance = Double.MAX_VALUE;
+        double progressX = x;
+        double progressY = y;
+        long progressMs = startNs / 1000000L;
+        boolean reached = false;
+        String failure = "Drive TIMED OUT";
+
+        while (opMode.opModeIsActive()) {
+            update();
+            long nowMs = System.nanoTime() / 1000000L;
+            double elapsed = (System.nanoTime() - startNs) / 1e9;
+            double distance = Math.hypot(targetX - x, targetY - y);
+
+            if (distance <= DRIVE_TOLERANCE_IN) {
+                reached = true;
+                break;
+            }
+            // Closest approach: past the point and moving away from it, close enough to call it
+            minDistance = Math.min(minDistance, distance);
+            if (minDistance < 3.0 && distance > minDistance + 0.5) {
+                reached = true;
+                break;
+            }
+            if (elapsed > timeoutSeconds) {
+                break;
+            }
+
+            // Re-aim from the live pose, except very near the point where the bearing is unstable
+            if (distance > AIM_FREEZE_IN) {
+                desired = aimHeading(targetX, targetY, backward);
+            }
+            holdHeading = desired;
+            double error = normalizeDegrees(desired - heading);
+
+            // Pointed far off (knocked hard, or a corner in the route): stop and turn in place
+            if (distance > AIM_FREEZE_IN && Math.abs(error) > REAIM_TURN_DEG) {
+                turn(desired, DEFAULT_TURN_TIMEOUT_S, null);
+                rampStartNs = System.nanoTime();
+                update();
+                progressX = x;
+                progressY = y;
+                progressMs = System.nanoTime() / 1000000L;
+                continue;
+            }
+
+            // Blocked: barely moved for a while although power is being sent
+            if (distance > STALL_IGNORE_IN) {
+                if (Math.hypot(x - progressX, y - progressY) >= STALL_MIN_MOVE_IN) {
+                    progressX = x;
+                    progressY = y;
+                    progressMs = nowMs;
+                } else if (nowMs - progressMs >= STALL_TIME_MS) {
+                    failure = "Drive BLOCKED";
+                    break;
+                }
+            }
+
+            // Slow down near the point, and ramp up gently at the start
+            double rampElapsed = (System.nanoTime() - rampStartNs) / 1e9;
+            double power = Math.max(DRIVE_MIN_POWER, Math.min(maxPower, DRIVE_KP * distance));
+            double ramp = DRIVE_MIN_POWER + (maxPower - DRIVE_MIN_POWER) * (rampElapsed / rampSec);
+            power = Math.min(power, ramp);
+
+            // A positive error means the robot must turn right
+            double correction = Math.max(-HOLD_MAX_CORR, Math.min(HOLD_MAX_CORR, HOLD_KP * error));
+            double base = backward ? -power : power;
+            setSidePowers(base + correction, base - correction);
+
+            showProgress("Driving to point", distance);
+            opMode.idle();
+        }
+        stop();
+        if (!reached && opMode.opModeIsActive()) {
+            update();
+            opMode.telemetry.log().add("%s, %.1f in from (%.0f, %.0f)", failure,
+                    Math.hypot(targetX - x, targetY - y), targetX, targetY);
+            opMode.telemetry.update();
+        }
+        return reached;
+    }
+
+    /**
+     * Heading the robot should have to travel to the point. Heading 0 faces +Y and 90 faces +X, so
+     * the bearing from the robot to the point is atan2(dx, dy). In reverse the back faces the point.
+     */
+    private double aimHeading(double targetX, double targetY, boolean backward) {
+        double bearing = Math.toDegrees(Math.atan2(targetX - x, targetY - y));
+        return normalizeDegrees(backward ? bearing + 180.0 : bearing);
+    }
+
+    private boolean driveDistance(double signedInches, double timeoutSeconds, MoveSpeed speed) {
+        double maxPower = speed == null ? DRIVE_MAX_POWER : speed.power(DRIVE_MAX_POWER, DRIVE_MIN_POWER);
+        double rampSec = speed == null ? DRIVE_RAMP_SEC : speed.ramp(DRIVE_RAMP_SEC);
         update();
         double startPosX = x;
         double startPosY = y;
@@ -215,8 +426,8 @@ public class BiobuzzAutoDrive {
             }
 
             // Slow down near the target, and ramp up gently at the start
-            double power = Math.max(DRIVE_MIN_POWER, Math.min(DRIVE_MAX_POWER, DRIVE_KP * remaining));
-            double ramp = DRIVE_MIN_POWER + (DRIVE_MAX_POWER - DRIVE_MIN_POWER) * (elapsed / DRIVE_RAMP_SEC);
+            double power = Math.max(DRIVE_MIN_POWER, Math.min(maxPower, DRIVE_KP * remaining));
+            double ramp = DRIVE_MIN_POWER + (maxPower - DRIVE_MIN_POWER) * (elapsed / rampSec);
             power = Math.min(power, ramp);
 
             // Steer to hold the heading. A positive error means the robot must turn right.
@@ -230,10 +441,15 @@ public class BiobuzzAutoDrive {
             opMode.idle();
         }
         stop();
+        if (!reached && opMode.opModeIsActive()) {
+            opMode.telemetry.log().add("Drive TIMED OUT, %.1f in short", Math.max(0.0, target - ((x - startPosX) * forwardX + (y - startPosY) * forwardY) * dir));
+            opMode.telemetry.update();
+        }
         return reached;
     }
 
-    private boolean turn(double targetDegrees, double timeoutSeconds) {
+    private boolean turn(double targetDegrees, double timeoutSeconds, MoveSpeed speed) {
+        double maxPower = speed == null ? TURN_MAX_POWER : speed.power(TURN_MAX_POWER, TURN_MIN_POWER);
         holdHeading = normalizeDegrees(targetDegrees);
         long startNs = System.nanoTime();
         long settleStartMs = -1;
@@ -263,7 +479,7 @@ public class BiobuzzAutoDrive {
 
             double power = 0.0;
             if (!inside) {
-                power = Math.max(TURN_MIN_POWER, Math.min(TURN_MAX_POWER, TURN_KP * Math.abs(error)));
+                power = Math.max(TURN_MIN_POWER, Math.min(maxPower, TURN_KP * Math.abs(error)));
                 if (error < 0) power = -power;
             }
             // Turning right: left side forward, right side backward
@@ -273,6 +489,10 @@ public class BiobuzzAutoDrive {
             opMode.idle();
         }
         stop();
+        if (!reached && opMode.opModeIsActive()) {
+            opMode.telemetry.log().add("Turn TIMED OUT, %.1f deg off", Math.abs(normalizeDegrees(holdHeading - heading)));
+            opMode.telemetry.update();
+        }
         return reached;
     }
 

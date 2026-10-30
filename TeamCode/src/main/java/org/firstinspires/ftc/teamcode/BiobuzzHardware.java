@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode;
 
+import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
@@ -40,8 +41,16 @@ public class BiobuzzHardware {
 
     private HardwareMap hwMap = null;
 
+    // True while the shooter motor is in RUN_USING_ENCODER (velocity control)
+    private boolean shooterVelocityMode = true;
+
     public void init(HardwareMap ahwMap) {
         hwMap = ahwMap;
+
+        // Bulk-read hub data so repeated reads in one loop share a single hub transaction
+        for (LynxModule hub : hwMap.getAll(LynxModule.class)) {
+            hub.setBulkCachingMode(LynxModule.BulkCachingMode.AUTO);
+        }
 
         // Initialize Motors
         tankLeftFront  = hwMap.get(DcMotor.class, "tankLeftFront");
@@ -137,8 +146,24 @@ public class BiobuzzHardware {
         return Math.max(10.5, voltage);
     }
 
+    /**
+     * Sets the shooter wheel speed. A target of 0 coasts the wheel: velocity control would
+     * actively brake it toward 0, so the motor is switched to open-loop with zero power instead.
+     */
     public void setShooterWheelRpm(double wheelRpm) {
-        shooterMotor.setVelocity((Math.abs(wheelRpm) * TICKS_PER_MOTOR_REV) / 60.0);
+        if (Math.abs(wheelRpm) < 1.0) {
+            if (shooterVelocityMode) {
+                shooterMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+                shooterVelocityMode = false;
+            }
+            shooterMotor.setPower(0.0);
+        } else {
+            if (!shooterVelocityMode) {
+                shooterMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                shooterVelocityMode = true;
+            }
+            shooterMotor.setVelocity((Math.abs(wheelRpm) * TICKS_PER_MOTOR_REV) / 60.0);
+        }
     }
 
     public double getShooterWheelRpm() {

@@ -26,11 +26,28 @@ public class BiobuzzTankDrive extends LinearOpMode {
     double rampedTurn = 0.0;
     ElapsedTime rampTimer = new ElapsedTime();
 
+    // Field position from the OTOS (null if the sensor is not available)
+    BiobuzzAutoDrive pose = null;
+    boolean prevPoseReset = false;
+
     @Override
     public void runOpMode() {
 
         // Initialize robot hardware
         robot.init(hardwareMap);
+
+        // Pick up the pose the auto ended at, or the reset pose if there isn't one
+        try {
+            pose = new BiobuzzAutoDrive(this, robot);
+            pose.initWithoutCalibration();
+            pose.setStartPose(
+                    PoseStore.getX(),
+                    PoseStore.getY(),
+                    PoseStore.getHeading()
+            );
+        } catch (Exception e) {
+            pose = null;
+        }
 
         telemetry.addData("Status", "Initialized");
         telemetry.addData("Drive Mode", "Arcade");
@@ -50,6 +67,24 @@ public class BiobuzzTankDrive extends LinearOpMode {
             }
 
             prevDpadRight = gamepad1.dpad_right;
+
+
+            // --- Field Pose (OTOS) ---
+
+            if (pose != null) {
+                // Failsafe: Gamepad 2 D-pad up resets the pose to the known reset position
+                if (gamepad2.dpad_up && !prevPoseReset) {
+                    pose.setStartPose(
+                            PoseStore.RESET_X,
+                            PoseStore.RESET_Y,
+                            PoseStore.RESET_HEADING
+                    );
+                }
+                prevPoseReset = gamepad2.dpad_up;
+
+                pose.update();
+                PoseStore.save(pose.getX(), pose.getY(), pose.getHeading());
+            }
 
 
             // --- Arcade Drive Power Calculation ---
@@ -73,12 +108,14 @@ public class BiobuzzTankDrive extends LinearOpMode {
             }
 
             // Ramp drive and turn toward the requested values to avoid tipping
-            double maxStep = rampTimer.seconds()
-                    / BiobuzzConstants.DRIVE_RAMP_TIME_SEC;
+            // (turn uses a much shorter ramp so steering stays crisp)
+            double dt = rampTimer.seconds();
             rampTimer.reset();
+            double maxDriveStep = dt / BiobuzzConstants.DRIVE_RAMP_TIME_SEC;
+            double maxTurnStep = dt / BiobuzzConstants.TURN_RAMP_TIME_SEC;
 
-            rampedDrive += Math.max(-maxStep, Math.min(maxStep, drive - rampedDrive));
-            rampedTurn += Math.max(-maxStep, Math.min(maxStep, turn - rampedTurn));
+            rampedDrive = BiobuzzConstants.slew(rampedDrive, drive, maxDriveStep);
+            rampedTurn = BiobuzzConstants.slew(rampedTurn, turn, maxTurnStep);
             drive = rampedDrive;
             turn = rampedTurn;
 
@@ -177,9 +214,15 @@ public class BiobuzzTankDrive extends LinearOpMode {
             );
 
             telemetry.addData("Gate",
-                    gamepad2.right_trigger
+                    gamepad1.right_trigger
                             > BiobuzzConstants.GATE_TRIGGER_THRESHOLD
                             ? "OPEN" : "CLOSED");
+
+            if (pose != null) {
+                pose.addPoseTelemetry();
+            } else {
+                telemetry.addData("Pose", "OTOS not available");
+            }
 
             telemetry.addData("Shooter Preset", targetPreset);
 
