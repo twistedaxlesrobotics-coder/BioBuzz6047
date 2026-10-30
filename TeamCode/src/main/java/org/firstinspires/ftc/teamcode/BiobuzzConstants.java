@@ -51,6 +51,36 @@ public class BiobuzzConstants {
     public static final long AUTO_AFTER_SHOT_WAIT_MS = 1000;
 
     // =========================================================
+    //  TELEOP SPOT + AIM  (Gamepad 1 bumpers)
+    //  Positions are field coordinates in inches. These are estimates - update after measuring.
+    // =========================================================
+
+    /** Right bumper: drive to the right spot and aim the back of the robot at the right goal. */
+    public static final double SPOT_RIGHT_X = 119.0;
+    public static final double SPOT_RIGHT_Y = 56.0;
+    public static final double GOAL_RIGHT_X = 92.0;
+    public static final double GOAL_RIGHT_Y = 60.0;
+
+    /** Left bumper: the mirror image of the right side across the field center (x = 72). */
+    public static final double SPOT_LEFT_X = 144.0 - SPOT_RIGHT_X;
+    public static final double SPOT_LEFT_Y = SPOT_RIGHT_Y;
+    public static final double GOAL_LEFT_X = 144.0 - GOAL_RIGHT_X;
+    public static final double GOAL_LEFT_Y = GOAL_RIGHT_Y;
+
+    /** Top power while driving to the spot. */
+    public static final double SPOT_APPROACH_MAX_POWER = 0.7;
+
+    /** The robot has arrived when it is this close to the spot (inches). */
+    public static final double SPOT_ARRIVE_TOL_IN = 1.0;
+
+    /** Aim is good within this many degrees; it re-aims only after drifting past RELOCK. */
+    public static final double AIM_TOLERANCE_DEG = 1.5;
+    public static final double AIM_RELOCK_DEG = 3.0;
+
+    /** The aim must stay good this long before the controller buzzes "locked". */
+    public static final long AIM_SETTLE_MS = 150;
+
+    // =========================================================
     //  HELPERS
     // =========================================================
 
