@@ -52,11 +52,11 @@ public class BiobuzzHardware {
         shooterMotor   = hwMap.get(DcMotorEx.class, "shooterMotor");
         triggerServo   = hwMap.get(Servo.class, "triggerServo");
 
-        // Drivetrain: Left REVERSE, Right FORWARD (for external gearing)
-        tankLeftFront.setDirection(DcMotorSimple.Direction.REVERSE);
-        tankLeftBack.setDirection(DcMotorSimple.Direction.REVERSE);
-        tankRightFront.setDirection(DcMotorSimple.Direction.FORWARD);
-        tankRightBack.setDirection(DcMotorSimple.Direction.FORWARD);
+        // Drivetrain: Left FORWARD, Right REVERSE (for external gearing)
+        tankLeftFront.setDirection(DcMotorSimple.Direction.FORWARD);
+        tankLeftBack.setDirection(DcMotorSimple.Direction.FORWARD);
+        tankRightFront.setDirection(DcMotorSimple.Direction.REVERSE);
+        tankRightBack.setDirection(DcMotorSimple.Direction.REVERSE);
 
         setDriveZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         setDriveMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);

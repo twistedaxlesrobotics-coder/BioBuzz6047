@@ -29,6 +29,13 @@ public class BiobuzzConstants {
     public static final double SHOOTER_RPM_TOLERANCE = 75.0;
 
     // =========================================================
+    //  DRIVE RAMP
+    // =========================================================
+
+    /** Seconds for drive/turn power to ramp across its full range (0 to 1). Raise to soften starts and stops. */
+    public static final double DRIVE_RAMP_TIME_SEC = 0.3;
+
+    // =========================================================
     //  GATE SERVO (ON/OFF)
     // =========================================================
 

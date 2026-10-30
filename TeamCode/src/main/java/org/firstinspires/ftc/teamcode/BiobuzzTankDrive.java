@@ -3,6 +3,7 @@ package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.util.ElapsedTime;
 
 @TeleOp(name = "Biobuzz Arcade Drive", group = "Linear Opmode")
 public class BiobuzzTankDrive extends LinearOpMode {
@@ -20,6 +21,11 @@ public class BiobuzzTankDrive extends LinearOpMode {
     // Button state for detecting D-pad presses
     boolean prevDpadRight = false;
 
+    // Drive ramp state (limits how fast drive/turn power can change)
+    double rampedDrive = 0.0;
+    double rampedTurn = 0.0;
+    ElapsedTime rampTimer = new ElapsedTime();
+
     @Override
     public void runOpMode() {
 
@@ -32,6 +38,7 @@ public class BiobuzzTankDrive extends LinearOpMode {
 
         // Wait for the driver to press PLAY
         waitForStart();
+        rampTimer.reset();
 
         // Main robot control loop
         while (opModeIsActive()) {
@@ -64,6 +71,16 @@ public class BiobuzzTankDrive extends LinearOpMode {
             if (isReversed) {
                 drive *= -1;
             }
+
+            // Ramp drive and turn toward the requested values to avoid tipping
+            double maxStep = rampTimer.seconds()
+                    / BiobuzzConstants.DRIVE_RAMP_TIME_SEC;
+            rampTimer.reset();
+
+            rampedDrive += Math.max(-maxStep, Math.min(maxStep, drive - rampedDrive));
+            rampedTurn += Math.max(-maxStep, Math.min(maxStep, turn - rampedTurn));
+            drive = rampedDrive;
+            turn = rampedTurn;
 
             // Combine forward movement and turning
             double leftPower = (drive + turn) * driveScale;
