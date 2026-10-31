@@ -39,6 +39,15 @@ public abstract class BiobuzzAutoBase extends LinearOpMode {
         return null;
     }
 
+    /**
+     * Seconds after START before the opening shot may fire. The robot still drives to the shot spot
+     * and spins the shooter up straight away, then waits here. An auto can override this to delay
+     * its shot.
+     */
+    protected double getEarliestShotSeconds() {
+        return 0.0;
+    }
+
     /** The moves that follow the opening shot. */
     protected abstract void runRoute();
 
@@ -85,6 +94,9 @@ public abstract class BiobuzzAutoBase extends LinearOpMode {
                     BiobuzzAutoDrive.DEFAULT_DRIVE_TIMEOUT_S, getMoveSpeed());
         }
 
+        // Hold the shot until the earliest allowed time, with the shooter spinning
+        waitUntilAutoTime(getEarliestShotSeconds());
+
         // Running late: skip the shot so there is time to park
         if (pastParkDeadline()) {
             telemetry.log().add("Past park deadline, skipping the shot");
@@ -93,6 +105,17 @@ public abstract class BiobuzzAutoBase extends LinearOpMode {
         }
         waitForShooterAtSpeed();
         shoot();
+    }
+
+    /** Waits, keeping the shooter at speed, until the auto timer reaches the given number of seconds. */
+    protected void waitUntilAutoTime(double seconds) {
+        while (opModeIsActive() && autoTimer.seconds() < seconds) {
+            robot.applyShooterPIDFWithVoltageComp();
+            telemetry.addData("Waiting to shoot", "%.1f s left", seconds - autoTimer.seconds());
+            telemetry.addData("Shooter RPM", "%.0f", robot.getShooterWheelRpm());
+            telemetry.update();
+            idle();
+        }
     }
 
     /** True once the auto has run long enough that only the park should still be attempted. */
