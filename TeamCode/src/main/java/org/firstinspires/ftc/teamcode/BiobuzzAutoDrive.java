@@ -54,7 +54,7 @@ public class BiobuzzAutoDrive {
     public static double DRIVE_MAX_POWER = 0.7;
     public static double DRIVE_MIN_POWER = 0.12;
     /** Power per inch remaining; slows the robot down as it nears the target. */
-    public static double DRIVE_KP = 0.025;
+    public static double DRIVE_KP = 0.020;
     public static double DRIVE_TOLERANCE_IN = 0.5;
     /** Time to ramp from the minimum to the maximum power at the start of a move. */
     public static double DRIVE_RAMP_SEC = 0.3;

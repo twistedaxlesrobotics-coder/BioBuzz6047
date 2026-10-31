@@ -67,6 +67,10 @@ public class BiobuzzConstants {
     public static final double GOAL_LEFT_X = 49.0;
     public static final double GOAL_LEFT_Y = 59.0;
 
+    /** Teleop heading hold (Gamepad 1 bumpers): field headings to turn to and hold while held. */
+    public static final double HEADING_HOLD_RIGHT_DEG = 90.0;
+    public static final double HEADING_HOLD_LEFT_DEG = -90.0;
+
     /** Top power while driving to the spot. */
     public static final double SPOT_APPROACH_MAX_POWER = 0.7;
 
