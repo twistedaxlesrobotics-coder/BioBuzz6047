@@ -36,9 +36,9 @@ public class OtosCheckOpMode extends LinearOpMode {
 
     // Set these to match how the Control Hub is mounted on the robot
     private static final RevHubOrientationOnRobot.LogoFacingDirection LOGO_DIRECTION =
-            RevHubOrientationOnRobot.LogoFacingDirection.UP;
+            RevHubOrientationOnRobot.LogoFacingDirection.LEFT;
     private static final RevHubOrientationOnRobot.UsbFacingDirection USB_DIRECTION =
-            RevHubOrientationOnRobot.UsbFacingDirection.FORWARD;
+            RevHubOrientationOnRobot.UsbFacingDirection.UP;
 
     BiobuzzHardware robot = new BiobuzzHardware();
 

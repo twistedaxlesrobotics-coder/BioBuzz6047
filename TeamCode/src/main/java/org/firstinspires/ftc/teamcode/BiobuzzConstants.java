@@ -8,15 +8,15 @@ public class BiobuzzConstants {
 
     // =========================================================
     //  SHOOTER (SPEEDS + TOLERANCES)
-    // =========================================================
+    // ================ =========================================
 
     public enum ShooterPreset { STOP, CLOSE, }
 
     // Preset RPM values (mimicking last year's top motor speeds)
-    public static final double RPM_CLOSE = 2500.0;
+    public static final double RPM_CLOSE = 2350.0;
 
     /**
-     * Look up the target RPM for a specific preset.
+     *
      */
     public static double getTargetRpm(ShooterPreset preset) {
         switch (preset) {
@@ -56,16 +56,16 @@ public class BiobuzzConstants {
     // =========================================================
 
     /** Right bumper: drive to the right spot and aim the back of the robot at the right goal. */
-    public static final double SPOT_RIGHT_X = 119.0;
-    public static final double SPOT_RIGHT_Y = 56.0;
+    public static final double SPOT_RIGHT_X = 118.0;
+    public static final double SPOT_RIGHT_Y = 55.5;
     public static final double GOAL_RIGHT_X = 92.0;
-    public static final double GOAL_RIGHT_Y = 60.0;
+    public static final double GOAL_RIGHT_Y = 58.0;
 
     /** Left bumper: the mirror image of the right side across the field center (x = 72). */
-    public static final double SPOT_LEFT_X = 144.0 - SPOT_RIGHT_X;
-    public static final double SPOT_LEFT_Y = SPOT_RIGHT_Y;
-    public static final double GOAL_LEFT_X = 144.0 - GOAL_RIGHT_X;
-    public static final double GOAL_LEFT_Y = GOAL_RIGHT_Y;
+    public static final double SPOT_LEFT_X = 23.0;
+    public static final double SPOT_LEFT_Y = 55.5;
+    public static final double GOAL_LEFT_X = 49.0;
+    public static final double GOAL_LEFT_Y = 59.0;
 
     /** Top power while driving to the spot. */
     public static final double SPOT_APPROACH_MAX_POWER = 0.7;

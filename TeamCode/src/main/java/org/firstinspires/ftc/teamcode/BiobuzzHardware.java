@@ -33,7 +33,7 @@ public class BiobuzzHardware {
     public static final double MOTOR_TO_WHEEL = 1.0; 
 
     // Shooter PIDF Tuning
-    public static final double SHOOTER_KP = 100.0;
+    public static final double SHOOTER_KP = 200.0;
     public static final double SHOOTER_KI = 0.0;
     public static final double SHOOTER_KD = 0.0;
     public static final double SHOOTER_KF_SCALE = 1.22; 

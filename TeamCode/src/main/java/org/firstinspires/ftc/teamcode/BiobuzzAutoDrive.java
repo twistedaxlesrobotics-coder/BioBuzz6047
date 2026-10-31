@@ -40,13 +40,13 @@ public class BiobuzzAutoDrive {
     /** Name of the SparkFun OTOS in the robot configuration. */
     public static final String OTOS_NAME = "otos";
     /** Sensor position relative to the robot's center of rotation. +X = right, +Y = forward (inches). */
-    public static final double OTOS_OFFSET_X = 0.0;
-    public static final double OTOS_OFFSET_Y = 0.0;
+    public static final double OTOS_OFFSET_X = -2.0;
+    public static final double OTOS_OFFSET_Y = 3.0;
     /** Sensor mounting angle relative to the robot, degrees, + = counterclockwise. */
-    public static final double OTOS_OFFSET_H = 0.0;
+    public static final double OTOS_OFFSET_H = 180.0;
     /** Scale corrections from calibration (0.872 to 1.127). */
-    public static final double OTOS_LINEAR_SCALAR = 1.0;
-    public static final double OTOS_ANGULAR_SCALAR = 1.0;
+    public static final double OTOS_LINEAR_SCALAR = 1.00;
+    public static final double OTOS_ANGULAR_SCALAR = 0.995;
 
     // =========================================================
     //  DRIVING (starting values - tune on the robot; not final so OtosTuningOpMode can adjust them live)
@@ -54,7 +54,7 @@ public class BiobuzzAutoDrive {
     public static double DRIVE_MAX_POWER = 0.7;
     public static double DRIVE_MIN_POWER = 0.12;
     /** Power per inch remaining; slows the robot down as it nears the target. */
-    public static double DRIVE_KP = 0.04;
+    public static double DRIVE_KP = 0.025;
     public static double DRIVE_TOLERANCE_IN = 0.5;
     /** Time to ramp from the minimum to the maximum power at the start of a move. */
     public static double DRIVE_RAMP_SEC = 0.3;
