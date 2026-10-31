@@ -53,6 +53,23 @@ public class BiobuzzConstants {
     public static final long AUTO_AFTER_SHOT_WAIT_MS = 1000;
 
     // =========================================================
+    //  TELEOP DRIVING (Gamepad 1 sticks)
+    // =========================================================
+
+    /** Full left-stick forward/back is this fraction of full power. Lower it to slow the robot down. */
+    public static final double TELEOP_DRIVE_SCALE = 0.85;
+
+    /** Full right-stick turn is this fraction of full power. Lower it to turn more gently. */
+    public static final double TELEOP_TURN_SCALE = 0.60;
+
+    /** Straight-drive gyro assist: active while driving with the right stick inside this deadband. */
+    public static final double STRAIGHT_ASSIST_DEADBAND = 0.08;
+
+    /** Steering power added per degree the robot has turned off its heading, and its limit. */
+    public static final double STRAIGHT_ASSIST_KP = 0.02;
+    public static final double STRAIGHT_ASSIST_MAX = 0.20;
+
+    // =========================================================
     //  TELEOP SPOT + AIM  (Gamepad 1 bumpers)
     //  Positions are field coordinates in inches. These are estimates - update after measuring.
     // =========================================================

@@ -43,6 +43,10 @@ public class BiobuzzTankDrive extends LinearOpMode {
     IMU imu = null;
     double imuHeadingOffset = 0.0;
 
+    // Straight-drive gyro assist: the heading being held while driving straight
+    boolean straightHolding = false;
+    double straightHeading = 0.0;
+
     @Override
     public void runOpMode() {
 
@@ -176,6 +180,7 @@ public class BiobuzzTankDrive extends LinearOpMode {
                 rampedDrive = 0.0;
                 rampedTurn = 0.0;
                 rampTimer.reset();
+                straightHolding = false;
             } else {
                 // Left stick Y controls forward/backward
                 double drive = -gamepad1.left_stick_y;
@@ -188,6 +193,15 @@ public class BiobuzzTankDrive extends LinearOpMode {
                     drive *= -1;
                 }
 
+                // Straight-drive assist applies when the right stick is centered and you are driving
+                boolean wantStraight = Math.abs(gamepad1.right_stick_x)
+                        < BiobuzzConstants.STRAIGHT_ASSIST_DEADBAND
+                        && Math.abs(gamepad1.left_stick_y) > 0.1;
+
+                // Lower the top speed, and the top turn rate even more
+                drive *= BiobuzzConstants.TELEOP_DRIVE_SCALE;
+                turn *= BiobuzzConstants.TELEOP_TURN_SCALE;
+
                 // Ramp drive and turn toward the requested values to avoid tipping
                 // (turn uses a much shorter ramp so steering stays crisp)
                 double dt = rampTimer.seconds();
@@ -199,6 +213,22 @@ public class BiobuzzTankDrive extends LinearOpMode {
                 rampedTurn = BiobuzzConstants.slew(rampedTurn, turn, maxTurnStep);
                 drive = rampedDrive;
                 turn = rampedTurn;
+
+                // Gyro assist: hold the heading the robot had when you started driving straight.
+                // A positive error means the robot must turn right, which is a positive turn.
+                if (imu != null && wantStraight) {
+                    double heading = getImuHeading();
+                    if (!straightHolding) {
+                        straightHeading = heading;
+                        straightHolding = true;
+                    }
+                    double error = BiobuzzAutoDrive.normalizeDegrees(straightHeading - heading);
+                    turn += Math.max(-BiobuzzConstants.STRAIGHT_ASSIST_MAX,
+                            Math.min(BiobuzzConstants.STRAIGHT_ASSIST_MAX,
+                                    BiobuzzConstants.STRAIGHT_ASSIST_KP * error));
+                } else {
+                    straightHolding = false;
+                }
 
                 // Combine forward movement and turning
                 double leftPower = (drive + turn) * driveScale;
@@ -309,6 +339,7 @@ public class BiobuzzTankDrive extends LinearOpMode {
             if (headingHold != null) {
                 telemetry.addData("IMU Heading (deg)", "%.1f", getImuHeading());
                 telemetry.addData("Heading Hold", headingHold.getStatus());
+                telemetry.addData("Straight Assist", straightHolding ? "HOLDING" : "off");
             } else {
                 telemetry.addData("Heading Hold", "IMU not available");
             }
