@@ -181,6 +181,14 @@ public class BiobuzzTankDrive extends LinearOpMode {
                 rampedTurn = 0.0;
                 rampTimer.reset();
                 straightHolding = false;
+            } else if (gamepad1.dpad_left) {
+                // Victory spin (hold Gamepad 1 D-pad left): full power clockwise, left side forward
+                // and right side back. The sticks are ignored; releasing it hands control back.
+                robot.setDrivePower(1.0, 1.0, -1.0, -1.0);
+                rampedDrive = 0.0;
+                rampedTurn = 0.0;
+                rampTimer.reset();
+                straightHolding = false;
             } else {
                 // Left stick Y controls forward/backward
                 double drive = -gamepad1.left_stick_y;
