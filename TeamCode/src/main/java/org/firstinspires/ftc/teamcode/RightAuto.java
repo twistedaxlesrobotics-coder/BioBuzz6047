@@ -11,18 +11,18 @@ import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 public class RightAuto extends BiobuzzAutoBase {
 
     private static final double WAYPOINT_1_X = 119.0;
-    private static final double WAYPOINT_1_Y = 10.0;
+    private static final double WAYPOINT_1_Y = 22.0;
     private static final double WAYPOINT_1_TIMEOUT_S = 6.0;
     private static final double END_X = 47.0;
-    private static final double END_Y = 10.0;
+    private static final double END_Y = 15.0;
     private static final double END_TIMEOUT_S = 8.0;
 
-    @Override protected double getStartX() { return 135.0; }
-    @Override protected double getStartY() { return 56.0; }
+    @Override protected double getStartX() { return 131.5; }
+    @Override protected double getStartY() { return 57.5; }
     @Override protected double getStartHeading() { return 90.0; }
 
-    @Override protected double getShotX() { return 119.0; }
-    @Override protected double getShotY() { return 56.0; }
+    @Override protected double getShotX() { return 118.0; }
+    @Override protected double getShotY() { return 57.5; }
 
     @Override
     protected void runRoute() {

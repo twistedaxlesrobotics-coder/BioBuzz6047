@@ -57,10 +57,10 @@ public class BiobuzzConstants {
     // =========================================================
 
     /** Full left-stick forward/back is this fraction of full power. Lower it to slow the robot down. */
-    public static final double TELEOP_DRIVE_SCALE = 0.85;
+    public static final double TELEOP_DRIVE_SCALE = 0.7;
 
     /** Full right-stick turn is this fraction of full power. Lower it to turn more gently. */
-    public static final double TELEOP_TURN_SCALE = 0.60;
+    public static final double TELEOP_TURN_SCALE = 0.4;
 
     /** Straight-drive gyro assist: active while driving with the right stick inside this deadband. */
     public static final double STRAIGHT_ASSIST_DEADBAND = 0.08;
