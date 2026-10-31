@@ -219,13 +219,20 @@ public class BiobuzzTankDrive extends LinearOpMode {
                 if (imu != null && wantStraight) {
                     double heading = getImuHeading();
                     if (!straightHolding) {
-                        straightHeading = heading;
-                        straightHolding = true;
+                        // After a turn, wait until the robot has stopped rotating before locking on,
+                        // so it holds the heading it ended up at, not one it was still swinging through
+                        double spin = imu.getRobotAngularVelocity(AngleUnit.DEGREES).zRotationRate;
+                        if (Math.abs(spin) < BiobuzzConstants.STRAIGHT_ASSIST_SETTLE_DPS) {
+                            straightHeading = heading;
+                            straightHolding = true;
+                        }
                     }
-                    double error = BiobuzzAutoDrive.normalizeDegrees(straightHeading - heading);
-                    turn += Math.max(-BiobuzzConstants.STRAIGHT_ASSIST_MAX,
-                            Math.min(BiobuzzConstants.STRAIGHT_ASSIST_MAX,
-                                    BiobuzzConstants.STRAIGHT_ASSIST_KP * error));
+                    if (straightHolding) {
+                        double error = BiobuzzAutoDrive.normalizeDegrees(straightHeading - heading);
+                        turn += Math.max(-BiobuzzConstants.STRAIGHT_ASSIST_MAX,
+                                Math.min(BiobuzzConstants.STRAIGHT_ASSIST_MAX,
+                                        BiobuzzConstants.STRAIGHT_ASSIST_KP * error));
+                    }
                 } else {
                     straightHolding = false;
                 }

@@ -67,6 +67,9 @@ public class BiobuzzConstants {
 
     /** Steering power added per degree the robot has turned off its heading, and its limit. */
     public static final double STRAIGHT_ASSIST_KP = 0.02;
+
+    /** After a turn, the assist locks on only once the robot rotates slower than this (degrees per second). */
+    public static final double STRAIGHT_ASSIST_SETTLE_DPS = 20.0;
     public static final double STRAIGHT_ASSIST_MAX = 0.20;
 
     // =========================================================
