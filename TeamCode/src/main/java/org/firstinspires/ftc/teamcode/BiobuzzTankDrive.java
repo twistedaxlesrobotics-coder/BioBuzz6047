@@ -1,9 +1,13 @@
 
 package org.firstinspires.ftc.teamcode;
 
+import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.util.ElapsedTime;
+
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 
 @TeleOp(name = "Biobuzz Arcade Drive", group = "Linear Opmode")
 public class BiobuzzTankDrive extends LinearOpMode {
@@ -35,6 +39,10 @@ public class BiobuzzTankDrive extends LinearOpMode {
     int assistSelection = 0;
     boolean prevAimLocked = false;
 
+    // Field heading for the hold comes from the hub IMU: heading = -yaw + offset (null if no IMU)
+    IMU imu = null;
+    double imuHeadingOffset = 0.0;
+
     @Override
     public void runOpMode() {
 
@@ -50,9 +58,21 @@ public class BiobuzzTankDrive extends LinearOpMode {
                     PoseStore.getY(),
                     PoseStore.getHeading()
             );
-            headingHold = new BiobuzzHeadingHold(pose);
         } catch (Exception e) {
             pose = null;
+        }
+
+        // Start the hub IMU at the heading the auto ended with (or the reset heading)
+        try {
+            imu = hardwareMap.get(IMU.class, "imu");
+            imu.initialize(new IMU.Parameters(new RevHubOrientationOnRobot(
+                    BiobuzzConstants.HUB_LOGO_DIRECTION,
+                    BiobuzzConstants.HUB_USB_DIRECTION)));
+            imu.resetYaw();
+            imuHeadingOffset = PoseStore.getHeading();
+            headingHold = new BiobuzzHeadingHold();
+        } catch (Exception e) {
+            imu = null;
             headingHold = null;
         }
 
@@ -78,16 +98,22 @@ public class BiobuzzTankDrive extends LinearOpMode {
 
             // --- Field Pose (OTOS) ---
 
+            // Failsafe: Gamepad 2 D-pad up resets the pose and heading to the known reset position
+            boolean poseReset = gamepad2.dpad_up && !prevPoseReset;
+            prevPoseReset = gamepad2.dpad_up;
+
+            if (poseReset && imu != null) {
+                imuHeadingOffset = PoseStore.RESET_HEADING + getImuYaw();
+            }
+
             if (pose != null) {
-                // Failsafe: Gamepad 2 D-pad up resets the pose to the known reset position
-                if (gamepad2.dpad_up && !prevPoseReset) {
+                if (poseReset) {
                     pose.setStartPose(
                             PoseStore.RESET_X,
                             PoseStore.RESET_Y,
                             PoseStore.RESET_HEADING
                     );
                 }
-                prevPoseReset = gamepad2.dpad_up;
 
                 pose.update();
                 PoseStore.save(pose.getX(), pose.getY(), pose.getHeading());
@@ -116,7 +142,7 @@ public class BiobuzzTankDrive extends LinearOpMode {
                 }
 
                 if (wanted != 0) {
-                    headingHold.update();
+                    headingHold.update(getImuHeading());
                     assistActive = true;
                 }
 
@@ -276,9 +302,15 @@ public class BiobuzzTankDrive extends LinearOpMode {
 
             if (pose != null) {
                 pose.addPoseTelemetry();
-                telemetry.addData("Heading Hold", headingHold.getStatus());
             } else {
                 telemetry.addData("Pose", "OTOS not available");
+            }
+
+            if (headingHold != null) {
+                telemetry.addData("IMU Heading (deg)", "%.1f", getImuHeading());
+                telemetry.addData("Heading Hold", headingHold.getStatus());
+            } else {
+                telemetry.addData("Heading Hold", "IMU not available");
             }
 
             telemetry.addData("Shooter Preset", targetPreset);
@@ -300,5 +332,15 @@ public class BiobuzzTankDrive extends LinearOpMode {
 
             telemetry.update();
         }
+    }
+
+    /** IMU yaw in degrees, counterclockwise positive (0 right after the IMU was reset). */
+    private double getImuYaw() {
+        return imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
+    }
+
+    /** Field heading from the IMU: 0 faces +Y and it increases turning right, so 90 faces +X. */
+    private double getImuHeading() {
+        return BiobuzzAutoDrive.normalizeDegrees(-getImuYaw() + imuHeadingOffset);
     }
 }

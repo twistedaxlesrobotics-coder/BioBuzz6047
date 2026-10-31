@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode;
 
+import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
+
 /**
  * BiobuzzConstants
  * Stores constants for shooter presets and tolerances, ported from last year's Decode logic.
@@ -66,6 +68,12 @@ public class BiobuzzConstants {
     public static final double SPOT_LEFT_Y = 55.5;
     public static final double GOAL_LEFT_X = 49.0;
     public static final double GOAL_LEFT_Y = 59.0;
+
+    /** How the Control Hub is mounted on the robot (for the hub IMU): logo faces left, USB ports point up. */
+    public static final RevHubOrientationOnRobot.LogoFacingDirection HUB_LOGO_DIRECTION =
+            RevHubOrientationOnRobot.LogoFacingDirection.LEFT;
+    public static final RevHubOrientationOnRobot.UsbFacingDirection HUB_USB_DIRECTION =
+            RevHubOrientationOnRobot.UsbFacingDirection.UP;
 
     /** Teleop heading hold (Gamepad 1 bumpers): field headings to turn to and hold while held. */
     public static final double HEADING_HOLD_RIGHT_DEG = 90.0;

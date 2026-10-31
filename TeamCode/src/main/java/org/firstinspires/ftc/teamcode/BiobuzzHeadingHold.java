@@ -3,8 +3,8 @@ package org.firstinspires.ftc.teamcode;
 /**
  * BiobuzzHeadingHold
  * Non-blocking "turn to a field heading and hold it" controller for teleop. Call start() when a
- * button goes down, update() every loop while it is held (after the pose has been updated), and
- * stop() when it is released. Send leftPower and rightPower to the drivetrain.
+ * button goes down, update() every loop while it is held (passing the current heading from
+ * whatever sensor is used), and stop() when it is released. Send leftPower and rightPower to the drivetrain.
  *
  * The robot pivots in place until it is within AIM_TOLERANCE_DEG of the heading, then brakes. If it
  * is turned more than AIM_RELOCK_DEG off, it pivots back. It never drives.
@@ -13,8 +13,6 @@ package org.firstinspires.ftc.teamcode;
  * the heading increases turning right, so 90 faces +X.
  */
 public class BiobuzzHeadingHold {
-
-    private final BiobuzzAutoDrive pose;
 
     private boolean active = false;
     private double targetHeading = 0;
@@ -25,10 +23,6 @@ public class BiobuzzHeadingHold {
     /** Power to send to the left and right sides of the drivetrain. */
     public double leftPower = 0;
     public double rightPower = 0;
-
-    public BiobuzzHeadingHold(BiobuzzAutoDrive pose) {
-        this.pose = pose;
-    }
 
     public void start(double headingDegrees) {
         targetHeading = BiobuzzAutoDrive.normalizeDegrees(headingDegrees);
@@ -56,10 +50,11 @@ public class BiobuzzHeadingHold {
         return String.format("%s %.0f deg", aimed ? "LOCKED" : "TURNING TO", targetHeading);
     }
 
-    public void update() {
+    /** Call every loop while held, with the robot's current field heading in degrees. */
+    public void update(double currentHeadingDegrees) {
         if (!active) return;
         long nowMs = System.nanoTime() / 1000000L;
-        double error = BiobuzzAutoDrive.normalizeDegrees(targetHeading - pose.getHeading());
+        double error = BiobuzzAutoDrive.normalizeDegrees(targetHeading - currentHeadingDegrees);
         double absError = Math.abs(error);
 
         if (relocking) {
