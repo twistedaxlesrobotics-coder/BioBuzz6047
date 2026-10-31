@@ -31,6 +31,14 @@ public abstract class BiobuzzAutoBase extends LinearOpMode {
     protected abstract double getShotX();
     protected abstract double getShotY();
 
+    /**
+     * Speed for the opening move to the shot spot. Null uses the defaults; an auto can override this
+     * to run that move slower.
+     */
+    protected BiobuzzAutoDrive.MoveSpeed getMoveSpeed() {
+        return null;
+    }
+
     /** The moves that follow the opening shot. */
     protected abstract void runRoute();
 
@@ -70,9 +78,11 @@ public abstract class BiobuzzAutoBase extends LinearOpMode {
      */
     protected void openingShot() {
         spoolShooter();
-        if (!drive.driveToBackward(getShotX(), getShotY())) {
+        if (!drive.driveToBackward(getShotX(), getShotY(),
+                BiobuzzAutoDrive.DEFAULT_DRIVE_TIMEOUT_S, getMoveSpeed())) {
             telemetry.log().add("Shot spot missed, trying once more");
-            drive.driveToBackward(getShotX(), getShotY());
+            drive.driveToBackward(getShotX(), getShotY(),
+                    BiobuzzAutoDrive.DEFAULT_DRIVE_TIMEOUT_S, getMoveSpeed());
         }
 
         // Running late: skip the shot so there is time to park
