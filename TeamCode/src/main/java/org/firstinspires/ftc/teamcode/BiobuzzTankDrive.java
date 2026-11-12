@@ -161,12 +161,9 @@ public class BiobuzzTankDrive extends LinearOpMode {
 
             // --- Arcade Drive Power Calculation ---
 
-            double driveScale = 1.0;
-
-            // Slow mode: hold Gamepad 1 left trigger
-            if (gamepad1.left_trigger > 0.1) {
-                driveScale = 0.25;
-            }
+            // Full power mode: hold Gamepad 1 left trigger. Full forward stick becomes 100% power
+            // on all drive motors; turning stays at its normal 40%.
+            boolean fullPower = gamepad1.left_trigger > 0.1;
 
             if (assistActive) {
                 // The heading hold drives; the sticks are ignored. Restart the stick ramp
@@ -177,14 +174,6 @@ public class BiobuzzTankDrive extends LinearOpMode {
                         headingHold.rightPower,
                         headingHold.rightPower
                 );
-                rampedDrive = 0.0;
-                rampedTurn = 0.0;
-                rampTimer.reset();
-                straightHolding = false;
-            } else if (gamepad1.dpad_left) {
-                // Victory spin (hold Gamepad 1 D-pad left): full power clockwise, left side forward
-                // and right side back. The sticks are ignored; releasing it hands control back.
-                robot.setDrivePower(1.0, 1.0, -1.0, -1.0);
                 rampedDrive = 0.0;
                 rampedTurn = 0.0;
                 rampTimer.reset();
@@ -207,7 +196,10 @@ public class BiobuzzTankDrive extends LinearOpMode {
                         && Math.abs(gamepad1.left_stick_y) > 0.1;
 
                 // Lower the top speed, and the top turn rate even more
-                drive *= BiobuzzConstants.TELEOP_DRIVE_SCALE;
+                // Full power mode lifts drive to 100%; turning stays at its normal 40% either way
+                if (!fullPower) {
+                    drive *= BiobuzzConstants.TELEOP_DRIVE_SCALE;
+                }
                 turn *= BiobuzzConstants.TELEOP_TURN_SCALE;
 
                 // Ramp drive and turn toward the requested values to avoid tipping
@@ -246,8 +238,8 @@ public class BiobuzzTankDrive extends LinearOpMode {
                 }
 
                 // Combine forward movement and turning
-                double leftPower = (drive + turn) * driveScale;
-                double rightPower = (drive - turn) * driveScale;
+                double leftPower = (drive + turn);
+                double rightPower = (drive - turn);
 
                 // Normalize powers if either side exceeds 1.0
                 double max = Math.max(
@@ -328,8 +320,8 @@ public class BiobuzzTankDrive extends LinearOpMode {
                     isReversed ? "REVERSED" : "NORMAL"
             );
             telemetry.addData(
-                    "Slow Mode",
-                    driveScale < 1.0 ? "ON" : "OFF"
+                    "Full Power",
+                    fullPower ? "ON" : "OFF"
             );
 
             telemetry.addData(
