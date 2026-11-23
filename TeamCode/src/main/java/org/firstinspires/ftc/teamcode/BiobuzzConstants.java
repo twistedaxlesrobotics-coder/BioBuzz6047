@@ -115,6 +115,46 @@ public class BiobuzzConstants {
     public static final long AIM_SETTLE_MS = 150;
 
     // =========================================================
+    //  FIELD DRIVE  (Biobuzz Field Drive OpMode)
+    //  Starting values - tune on the robot. These are not final so the Field Drive Tuning OpMode
+    //  can change them live; copy the values you settle on back into this file.
+    // =========================================================
+
+    /** A stick must be pushed past this (0 to 1) to count as a direction. */
+    public static double FD_STICK_DEADBAND = 0.5;
+
+    /**
+     * While a stick is returning toward center and is below this deflection, its angle is ignored,
+     * so letting go never swings the robot toward a wandering angle. 0 turns this off.
+     */
+    public static double FD_STICK_FREEZE = 0.75;
+
+    /** Power with a stick held and the trigger untouched. The trigger adds the rest, up to 100%. */
+    public static double FD_THROTTLE_FLOOR = 0.20;
+
+    /** No forward power when the heading error is beyond CUTOFF; full power within FULL (degrees). */
+    public static double FD_ALIGN_CUTOFF_DEG = 30.0;
+    public static double FD_ALIGN_FULL_DEG = 5.0;
+
+    /** Turning: power per degree of heading error, and damping per degree/second of turn rate. */
+    public static double FD_TURN_KP = 0.030;
+    public static double FD_TURN_KD = 0.001;
+
+    /** Turning power limits. The minimum keeps it from crawling the last few degrees. */
+    public static double FD_TURN_MAX_POWER = 1.0;
+    public static double FD_TURN_MIN_POWER = 0.12;
+
+    /** The robot is on its heading within this many degrees, and stops turning. */
+    public static double FD_TURN_TOLERANCE_DEG = 2.0;
+
+    /** Forward/back power ramp, in power per second. Deceleration is gentler to stop the rocking. */
+    public static double FD_ACCEL_RATE = 3.0;
+    public static double FD_DECEL_RATE = 2.0;
+
+    /** Smoothing for the turn rate worked out from the heading (0 to 1; higher = less smoothing). */
+    public static double FD_RATE_FILTER = 0.4;
+
+    // =========================================================
     //  HELPERS
     // =========================================================
 
