@@ -2,9 +2,10 @@ package org.firstinspires.ftc.teamcode;
 
 /**
  * BiobuzzSpotAim
- * Non-blocking "go to a spot and aim at the goal" controller for teleop. Call start() when a
- * button goes down, update() every loop while it is held (after the pose has been updated), and
- * stop() when it is released. Send leftPower and rightPower to the drivetrain.
+ * Non-blocking "aim at a field point" controller for teleop. It can go to a spot first and then
+ * aim (start), or only aim from where the robot is (startAimOnly). Call one of them when a button
+ * goes down, update() every loop while it is held (after the pose has been updated), and stop()
+ * when it is released. Send leftPower and rightPower to the drivetrain.
  *
  * Phases:
  * - APPROACH: drive to the spot, forward or in reverse, whichever needs less turning. Turns in
@@ -78,6 +79,25 @@ public class BiobuzzSpotAim {
         double reverseError = Math.abs(BiobuzzAutoDrive.normalizeDegrees(bearing + 180.0 - h));
         backward = reverseError < forwardError;
         frozenDesired = BiobuzzAutoDrive.normalizeDegrees(backward ? bearing + 180.0 : bearing);
+
+        leftPower = 0;
+        rightPower = 0;
+    }
+
+    /**
+     * Aim only: pivot in place until the back of the robot faces the goal, from wherever the robot
+     * is, and hold that aim from the live pose. It never drives to a spot.
+     */
+    public void startAimOnly(double goalX, double goalY) {
+        this.goalX = goalX;
+        this.goalY = goalY;
+
+        active = true;
+        phase = Phase.AIM;
+        aimed = false;
+        relocking = true;
+        settleStartMs = -1;
+        pivoting = false;
 
         leftPower = 0;
         rightPower = 0;

@@ -73,11 +73,13 @@ public class BiobuzzConstants {
     public static final double STRAIGHT_ASSIST_MAX = 0.20;
 
     // =========================================================
-    //  TELEOP SPOT + AIM  (Gamepad 1 bumpers)
+    //  TELEOP AIM AT GOAL  (Gamepad 1 bumpers)
     //  Positions are field coordinates in inches. These are estimates - update after measuring.
+    //  Teleop only uses the GOAL points (the bumpers aim, they do not drive). The SPOT points
+    //  are used only if the drive-to-spot version of the aim is started.
     // =========================================================
 
-    /** Right bumper: drive to the right spot and aim the back of the robot at the right goal. */
+    /** Right bumper: aim the back of the robot at the right goal (the spot is the old drive-to point). */
     public static final double SPOT_RIGHT_X = 118.0;
     public static final double SPOT_RIGHT_Y = 55.5;
     public static final double GOAL_RIGHT_X = 92.0;
