@@ -22,7 +22,7 @@ public class LeftAuto extends BiobuzzAutoBase {
     private static final double END_Y = 20.0;
 
     /**
-     * The park move is stopped when this many seconds pass, even if the OTOS has not reported
+     * The park move is stopped when this many seconds pass, even if the Pinpoint has not reported
      * arriving. Time one full run and set this to the time it takes to reach the park, plus about 0.5.
      */
     private static final double END_TIMEOUT_S = 6.0;
@@ -40,7 +40,7 @@ public class LeftAuto extends BiobuzzAutoBase {
 
     @Override
     protected void runRoute() {
-        // One move, one attempt: if the OTOS loses distance, the timeout stops the robot, not the wall
+        // One move, one attempt: if the Pinpoint loses distance, the timeout stops the robot, not the wall
         drive.driveToBackward(END_X, END_Y, END_TIMEOUT_S, SPEED);
     }
 }

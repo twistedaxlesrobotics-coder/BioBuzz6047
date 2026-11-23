@@ -21,7 +21,7 @@ public class RightAuto extends BiobuzzAutoBase {
     private static final double END_Y = 15.0;
 
     /**
-     * The park move is stopped when this many seconds pass, even if the OTOS has not reported
+     * The park move is stopped when this many seconds pass, even if the Pinpoint has not reported
      * arriving. Time one full run and set this to the time it takes to reach x = 47, plus about 0.5.
      */
     private static final double END_TIMEOUT_S = 5.0;
@@ -39,7 +39,7 @@ public class RightAuto extends BiobuzzAutoBase {
     protected void runRoute() {
         viaBackward(WAYPOINT_1_X, WAYPOINT_1_Y, WAYPOINT_1_TIMEOUT_S, SPEED);
 
-        // One attempt only: if the OTOS loses distance, the timeout stops the robot, not the wall
+        // One attempt only: if the Pinpoint loses distance, the timeout stops the robot, not the wall
         drive.driveToBackward(END_X, END_Y, END_TIMEOUT_S, SPEED);
     }
 }

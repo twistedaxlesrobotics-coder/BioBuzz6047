@@ -30,7 +30,7 @@ public class BiobuzzTankDrive extends LinearOpMode {
     double rampedTurn = 0.0;
     ElapsedTime rampTimer = new ElapsedTime();
 
-    // Field position from the OTOS (null if the sensor is not available)
+    // Field position from the Pinpoint (null if the sensor is not available)
     BiobuzzAutoDrive pose = null;
     boolean prevPoseReset = false;
 
@@ -100,7 +100,7 @@ public class BiobuzzTankDrive extends LinearOpMode {
             prevDpadRight = gamepad1.dpad_right;
 
 
-            // --- Field Pose (OTOS) ---
+            // --- Field Pose (Pinpoint) ---
 
             // Failsafe: Gamepad 2 D-pad up resets the pose and heading to the known reset position
             boolean poseReset = gamepad2.dpad_up && !prevPoseReset;
@@ -340,7 +340,7 @@ public class BiobuzzTankDrive extends LinearOpMode {
             if (pose != null) {
                 pose.addPoseTelemetry();
             } else {
-                telemetry.addData("Pose", "OTOS not available");
+                telemetry.addData("Pose", "Pinpoint not available");
             }
 
             if (headingHold != null) {

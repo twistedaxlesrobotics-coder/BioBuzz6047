@@ -8,7 +8,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
  * Shared setup and shooting for the autonomous OpModes. A subclass supplies its start pose and the
  * route it drives after the opening shot, and adds the @Autonomous annotation.
  *
- * Sequence: init and calibrate the OTOS, set the start pose, then on START: spool the shooter while
+ * Sequence: init and calibrate the Pinpoint, set the start pose, then on START: spool the shooter while
  * backing up, wait for the wheel to reach speed, shoot, run the subclass route. The pose is saved
  * for teleop when the auto ends, even if it is stopped early.
  *
@@ -56,7 +56,7 @@ public abstract class BiobuzzAutoBase extends LinearOpMode {
         robot.init(hardwareMap);
 
         drive = new BiobuzzAutoDrive(this, robot);
-        drive.init();   // calibrates the OTOS - keep the robot still
+        drive.init();   // calibrates the Pinpoint - keep the robot still
         drive.setStartPose(getStartX(), getStartY(), getStartHeading());
 
         telemetry.addData("Status", "Ready. Press START.");

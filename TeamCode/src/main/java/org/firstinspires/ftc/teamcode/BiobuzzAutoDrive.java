@@ -1,13 +1,14 @@
 package org.firstinspires.ftc.teamcode;
 
-import com.qualcomm.hardware.sparkfun.SparkFunOTOS;
+import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 
 /**
- * Simple autonomous driving for the tank drive, using the SparkFun OTOS for position and heading.
+ * Simple autonomous driving for the tank drive, using the goBILDA Pinpoint for position and heading.
  *
  * Field coordinates (inches, degrees):
  * - Origin is the field corner at the left end of the driver wall.
@@ -20,7 +21,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
  *   BiobuzzHardware robot = new BiobuzzHardware();
  *   robot.init(hardwareMap);
  *   BiobuzzAutoDrive drive = new BiobuzzAutoDrive(this, robot);
- *   drive.init();                      // configures and calibrates the OTOS - keep the robot still
+ *   drive.init();                      // configures and calibrates the Pinpoint - keep the robot still
  *   drive.setStartPose(12, 0, 0);      // x, y, heading where the robot sits at the start
  *   waitForStart();
  *   drive.driveForward(36);
@@ -28,28 +29,34 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
  *   drive.driveBackward(12);
  * </pre>
  *
- * The OTOS must be mounted with its X axis to the robot's right and its Y axis forward (or the
- * mounting angle entered in OTOS_OFFSET_H). Offset, scalars and tuning values below are starting
- * values and need to be set and tuned once the sensor is on the robot.
+ * The Pinpoint reports x forward, y left and heading counterclockwise, relative to where it was
+ * last zeroed. update() converts that into the field coordinates above. Pod offsets and encoder
+ * directions are set below; the driving values are starting values to tune on the robot.
  */
 public class BiobuzzAutoDrive {
 
     // =========================================================
-    //  OTOS SETUP  (set these when the sensor is mounted)
+    //  PINPOINT SETUP
     // =========================================================
-    /** Name of the SparkFun OTOS in the robot configuration. */
-    public static final String OTOS_NAME = "otos";
-    /** Sensor position relative to the robot's center of rotation. +X = right, +Y = forward (inches). */
-    public static final double OTOS_OFFSET_X = -2.0;
-    public static final double OTOS_OFFSET_Y = 3.0;
-    /** Sensor mounting angle relative to the robot, degrees, + = counterclockwise. */
-    public static final double OTOS_OFFSET_H = 180.0;
-    /** Scale corrections from calibration (0.872 to 1.127). */
-    public static final double OTOS_LINEAR_SCALAR = 1.00;
-    public static final double OTOS_ANGULAR_SCALAR = 0.995;
+    /** Name of the goBILDA Pinpoint in the robot configuration. */
+    public static final String PINPOINT_NAME = "pinpoint";
+    /**
+     * Pod positions relative to the robot's center of rotation, in millimeters.
+     * X pod (rolls forward/back): sideways distance, left = positive, right = negative.
+     * Y pod (rolls sideways): forward distance, forward = positive, behind = negative.
+     */
+    public static final double PINPOINT_X_POD_OFFSET_MM = 0.0;
+    public static final double PINPOINT_Y_POD_OFFSET_MM = 75.0;
+    /** Pod count directions: X must increase pushing forward, Y must increase pushing left. */
+    public static final GoBildaPinpointDriver.EncoderDirection PINPOINT_X_DIRECTION =
+            GoBildaPinpointDriver.EncoderDirection.REVERSED;
+    public static final GoBildaPinpointDriver.EncoderDirection PINPOINT_Y_DIRECTION =
+            GoBildaPinpointDriver.EncoderDirection.REVERSED;
+    /** Time to let the Pinpoint finish resetting and calibrating its IMU at init. */
+    public static final long PINPOINT_RESET_WAIT_MS = 300;
 
     // =========================================================
-    //  DRIVING (starting values - tune on the robot; not final so OtosTuningOpMode can adjust them live)
+    //  DRIVING (starting values - tune on the robot)
     // =========================================================
     public static double DRIVE_MAX_POWER = 0.7;
     public static double DRIVE_MIN_POWER = 0.12;
@@ -132,8 +139,8 @@ public class BiobuzzAutoDrive {
     private final LinearOpMode opMode;
     private final BiobuzzHardware robot;
 
-    /** The OTOS, exposed so test OpModes can read the raw sensor values. */
-    public SparkFunOTOS otos;
+    /** The Pinpoint, exposed so test OpModes can read the raw sensor values. */
+    public GoBildaPinpointDriver pinpoint;
 
     // Where the robot started, in field coordinates
     private double startX = 0, startY = 0, startHeading = 0;
@@ -152,32 +159,30 @@ public class BiobuzzAutoDrive {
     }
 
     /**
-     * Configures and calibrates the OTOS. The robot must be completely still while this runs
+     * Configures and calibrates the Pinpoint. The robot must be completely still while this runs
      * (about a second).
      */
     public void init() {
         initWithoutCalibration();
 
-        opMode.telemetry.addLine("Calibrating OTOS - do not move the robot");
+        opMode.telemetry.addLine("Calibrating Pinpoint - do not move the robot");
         opMode.telemetry.update();
-        otos.calibrateImu();
-        otos.resetTracking();
-        otos.setPosition(new SparkFunOTOS.Pose2D(0, 0, 0));
+        pinpoint.resetPosAndIMU();   // zeroes the position and recalibrates the IMU
+        opMode.sleep(PINPOINT_RESET_WAIT_MS);
+        pinpoint.setPosition(new Pose2D(DistanceUnit.INCH, 0, 0, AngleUnit.DEGREES, 0));
         update();
     }
 
     /**
-     * Configures the OTOS without calibrating the gyro or clearing its tracking. Use this in
+     * Configures the Pinpoint without calibrating the IMU or clearing its tracking. Use this in
      * teleop, where the robot may be moving or the sensor is already tracking. Call
      * setStartPose() afterward to set the pose.
      */
     public void initWithoutCalibration() {
-        otos = opMode.hardwareMap.get(SparkFunOTOS.class, OTOS_NAME);
-        otos.setLinearUnit(DistanceUnit.INCH);
-        otos.setAngularUnit(AngleUnit.DEGREES);
-        otos.setOffset(new SparkFunOTOS.Pose2D(OTOS_OFFSET_X, OTOS_OFFSET_Y, OTOS_OFFSET_H));
-        otos.setLinearScalar(OTOS_LINEAR_SCALAR);
-        otos.setAngularScalar(OTOS_ANGULAR_SCALAR);
+        pinpoint = opMode.hardwareMap.get(GoBildaPinpointDriver.class, PINPOINT_NAME);
+        pinpoint.setOffsets(PINPOINT_X_POD_OFFSET_MM, PINPOINT_Y_POD_OFFSET_MM, DistanceUnit.MM);
+        pinpoint.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
+        pinpoint.setEncoderDirections(PINPOINT_X_DIRECTION, PINPOINT_Y_DIRECTION);
     }
 
     /**
@@ -189,22 +194,29 @@ public class BiobuzzAutoDrive {
         startY = yInches;
         startHeading = normalizeDegrees(headingDegrees);
         holdHeading = startHeading;
-        // The OTOS now counts from zero in the robot's starting orientation.
-        otos.setPosition(new SparkFunOTOS.Pose2D(0, 0, 0));
+        // The Pinpoint now counts from zero in the robot's starting orientation.
+        pinpoint.setPosition(new Pose2D(DistanceUnit.INCH, 0, 0, AngleUnit.DEGREES, 0));
         update();
     }
 
     /**
-     * Reads the OTOS and updates the field pose. The OTOS reports x to the right, y forward and
+     * Reads the Pinpoint and updates the field pose. The Pinpoint reports x forward, y left and
      * heading counterclockwise, all relative to the robot's starting position and orientation.
+     * They are converted to right (px), forward (py) and counterclockwise (ph) before the
+     * rotation into field coordinates.
      */
     public void update() {
-        SparkFunOTOS.Pose2D p = otos.getPosition();
+        pinpoint.update();
+        Pose2D p = pinpoint.getPosition();
+        double px = -p.getY(DistanceUnit.INCH);
+        double py = p.getX(DistanceUnit.INCH);
+        double ph = p.getHeading(AngleUnit.DEGREES);
+
         double c = Math.cos(Math.toRadians(startHeading));
         double s = Math.sin(Math.toRadians(startHeading));
-        x = startX + p.x * c + p.y * s;
-        y = startY - p.x * s + p.y * c;
-        heading = normalizeDegrees(startHeading - p.h);
+        x = startX + px * c + py * s;
+        y = startY - px * s + py * c;
+        heading = normalizeDegrees(startHeading - ph);
     }
 
     public double getX() { return x; }
