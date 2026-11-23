@@ -39,6 +39,12 @@ public class BiobuzzTankDrive extends LinearOpMode {
     int assistSelection = 0;
     boolean prevAimLocked = false;
 
+    // Spot + aim mode for the bumpers (Gamepad 1 D-pad left toggles it). Off = the fixed headings.
+    // Needs the Pinpoint pose, so it is null if the sensor is not available.
+    BiobuzzSpotAim spotAim = null;
+    boolean xyAimMode = false;
+    boolean prevDpadLeft = false;
+
     // Field heading for the hold comes from the hub IMU: heading = -yaw + offset (null if no IMU)
     IMU imu = null;
     double imuHeadingOffset = 0.0;
@@ -62,8 +68,10 @@ public class BiobuzzTankDrive extends LinearOpMode {
                     PoseStore.getY(),
                     PoseStore.getHeading()
             );
+            spotAim = new BiobuzzSpotAim(pose);
         } catch (Exception e) {
             pose = null;
+            spotAim = null;
         }
 
         // Start the hub IMU at the heading the auto ended with (or the reset heading)
@@ -124,19 +132,54 @@ public class BiobuzzTankDrive extends LinearOpMode {
             }
 
 
-            // --- Heading Hold (Gamepad 1 bumpers) ---
-            // Hold the right bumper to turn to the right heading, or the left bumper for the left
-            // heading, and keep it there. The sticks are ignored while it is held; release to drive.
+            // --- Bumper Mode Toggle (Gamepad 1 D-pad left) ---
+            // Switches the bumpers between the fixed headings and spot + aim at a field point.
+            // Ignored if the Pinpoint pose is not available.
+
+            if (gamepad1.dpad_left && !prevDpadLeft && spotAim != null) {
+                xyAimMode = !xyAimMode;
+                // Drop any assist in progress so the new mode starts clean
+                spotAim.stop();
+                if (headingHold != null) {
+                    headingHold.stop();
+                }
+                assistSelection = 0;
+                prevAimLocked = false;
+                gamepad1.rumble(0.3, 0.3, 150);
+            }
+            prevDpadLeft = gamepad1.dpad_left;
+
+
+            // --- Bumper Assist (Gamepad 1 bumpers) ---
+            // Hold the right or left bumper. Fixed heading mode: turn to that side's heading and hold
+            // it. Spot + aim mode: drive to that side's spot, then keep the back of the robot (the
+            // shooter) aimed at that side's goal. The sticks are ignored while it is held; release
+            // to drive.
 
             boolean assistActive = false;
-            if (headingHold != null) {
+            double assistLeft = 0.0;
+            double assistRight = 0.0;
+            boolean useSpotAim = xyAimMode && spotAim != null;
+            if (useSpotAim || headingHold != null) {
                 boolean wantLeft = gamepad1.left_bumper && !gamepad1.right_bumper;
                 boolean wantRight = gamepad1.right_bumper && !gamepad1.left_bumper;
                 int wanted = wantLeft ? 1 : (wantRight ? 2 : 0);
 
                 if (wanted != assistSelection) {
                     assistSelection = wanted;
-                    if (wanted == 1) {
+                    if (useSpotAim) {
+                        if (wanted == 1) {
+                            spotAim.start(
+                                    BiobuzzConstants.SPOT_LEFT_X, BiobuzzConstants.SPOT_LEFT_Y,
+                                    BiobuzzConstants.GOAL_LEFT_X, BiobuzzConstants.GOAL_LEFT_Y);
+                        } else if (wanted == 2) {
+                            spotAim.start(
+                                    BiobuzzConstants.SPOT_RIGHT_X, BiobuzzConstants.SPOT_RIGHT_Y,
+                                    BiobuzzConstants.GOAL_RIGHT_X, BiobuzzConstants.GOAL_RIGHT_Y);
+                        } else {
+                            spotAim.stop();
+                        }
+                    } else if (wanted == 1) {
                         headingHold.start(BiobuzzConstants.HEADING_HOLD_LEFT_DEG);
                     } else if (wanted == 2) {
                         headingHold.start(BiobuzzConstants.HEADING_HOLD_RIGHT_DEG);
@@ -145,13 +188,26 @@ public class BiobuzzTankDrive extends LinearOpMode {
                     }
                 }
 
-                if (wanted != 0) {
-                    headingHold.update(getImuHeading());
-                    assistActive = true;
+                boolean locked;
+                if (useSpotAim) {
+                    if (wanted != 0) {
+                        spotAim.update();
+                        assistLeft = spotAim.leftPower;
+                        assistRight = spotAim.rightPower;
+                        assistActive = true;
+                    }
+                    locked = spotAim.isLocked();
+                } else {
+                    if (wanted != 0) {
+                        headingHold.update(getImuHeading());
+                        assistLeft = headingHold.leftPower;
+                        assistRight = headingHold.rightPower;
+                        assistActive = true;
+                    }
+                    locked = headingHold.isLocked();
                 }
 
-                // Buzz once when the robot is on the heading and settled
-                boolean locked = headingHold.isLocked();
+                // Buzz once when the robot is aimed and settled
                 if (locked && !prevAimLocked) {
                     gamepad1.rumble(0.6, 0.6, 300);
                 }
@@ -166,13 +222,13 @@ public class BiobuzzTankDrive extends LinearOpMode {
             boolean fullPower = gamepad1.left_trigger > 0.1;
 
             if (assistActive) {
-                // The heading hold drives; the sticks are ignored. Restart the stick ramp
+                // The bumper assist drives; the sticks are ignored. Restart the stick ramp
                 // from zero so control returns smoothly when the bumper is released.
                 robot.setDrivePower(
-                        headingHold.leftPower,
-                        headingHold.leftPower,
-                        headingHold.rightPower,
-                        headingHold.rightPower
+                        assistLeft,
+                        assistLeft,
+                        assistRight,
+                        assistRight
                 );
                 rampedDrive = 0.0;
                 rampedTurn = 0.0;
@@ -339,6 +395,11 @@ public class BiobuzzTankDrive extends LinearOpMode {
 
             if (pose != null) {
                 pose.addPoseTelemetry();
+                telemetry.addData("Bumper Mode",
+                        xyAimMode ? "SPOT + AIM (field point)" : "FIXED HEADING");
+                if (xyAimMode && spotAim != null) {
+                    telemetry.addData("Spot Aim", spotAim.getStatus());
+                }
             } else {
                 telemetry.addData("Pose", "Pinpoint not available");
             }
