@@ -2,9 +2,11 @@ package org.firstinspires.ftc.teamcode;
 
 /**
  * BiobuzzFieldDrive
- * Non-blocking "point and go" drive controller for teleop. The sticks pick a heading on the field,
- * the robot turns to it, and the trigger is the accelerator along that heading.
+ * Non-blocking field-centric drive controller for teleop, with two versions. In both, the robot turns
+ * to a heading on the field and holds it, and a stick or trigger sets how fast it drives along that
+ * heading. Headings are chosen with the sticks.
  *
+ * POINT AND GO (update):
  * - RIGHT stick: the FRONT of the robot points the way the stick points; the trigger drives forward.
  * - LEFT stick: the BACK of the robot points the way the stick points; the trigger drives backward.
  * - If both sticks are pushed, the right stick wins.
@@ -13,14 +15,20 @@ package org.firstinspires.ftc.teamcode;
  *   100%. Power is scaled down while the robot is turned away from the target heading, so it turns
  *   first and then rolls.
  *
- * Call update() every loop (after the pose has been updated) with the raw stick and trigger values
- * and the current field heading, then send leftPower and rightPower to the drivetrain. Call
- * holdHeadingNow() whenever something else is driving, or the pose was reset, so the robot does not
- * snap back to an old heading.
+ * HEADING + DRIVE (updateHeadingArcade):
+ * - RIGHT stick: the FRONT of the robot points the way the stick points. It only turns; it does not
+ *   move the robot. Released, the robot holds the last heading.
+ * - LEFT stick: forward or back along the robot's heading, proportional, topping out at
+ *   FD_ARCADE_MAX_POWER. The left trigger raises that top power toward 100%.
+ * - The two sticks are independent, so the robot may drive and turn at once.
  *
- * The target heading comes from updateTargetFromSticks(), kept separate from the turning and
- * throttle code so another source of target heading (such as aiming at a field point) can be added
- * without touching them.
+ * Call one of the update methods every loop (after the pose has been updated) with the raw stick and
+ * trigger values and the current field heading, then send leftPower and rightPower to the
+ * drivetrain. Call holdHeadingNow() whenever something else is driving, the pose was reset, or the
+ * version was switched, so the robot does not snap back to an old heading.
+ *
+ * The target heading is worked out separately from the turning and ramping code, so another source of
+ * target heading (such as aiming at a field point) can be added without touching them.
  *
  * Headings use the field convention in BiobuzzAutoDrive: 0 faces +Y (away from the drivers), and the
  * heading increases turning right, so 90 faces +X.
@@ -49,15 +57,17 @@ public class BiobuzzFieldDrive {
     private double prevLeftMag = 0;
     private double lastHeading = 0;
     private boolean hasLastHeading = false;
+    private double turnOut = 0;
 
     /**
-     * Holds the given heading and restarts the ramp from zero. Use it while another controller is
-     * driving and after a pose reset.
+     * Holds the given heading and restarts the ramps from zero. Use it while another controller is
+     * driving, after a pose reset, and when switching versions.
      */
     public void holdHeadingNow(double heading) {
         targetHeading = BiobuzzAutoDrive.normalizeDegrees(heading);
         hasTarget = true;
         drivePower = 0;
+        turnOut = 0;
         leftPower = 0;
         rightPower = 0;
         lastHeading = heading;
@@ -67,22 +77,14 @@ public class BiobuzzFieldDrive {
         targetFrozen = false;
     }
 
+    // =========================================================
+    //  POINT AND GO
+    // =========================================================
+
     public void update(double leftStickX, double leftStickY, double rightStickX, double rightStickY,
                        double trigger, double heading, double dtSeconds) {
-        double dt = Math.max(0.001, Math.min(0.1, dtSeconds));
-
-        // Start by holding the heading the robot has
-        if (!hasTarget) {
-            holdHeadingNow(heading);
-        }
-
-        // Turn rate worked out from the heading, smoothed
-        if (hasLastHeading) {
-            double raw = BiobuzzAutoDrive.normalizeDegrees(heading - lastHeading) / dt;
-            turnRateDps += BiobuzzConstants.FD_RATE_FILTER * (raw - turnRateDps);
-        }
-        lastHeading = heading;
-        hasLastHeading = true;
+        double dt = clampDt(dtSeconds);
+        prepare(heading, dt);
 
         // --- Target heading, and which stick is in charge ---
         int stick = updateTargetFromSticks(leftStickX, leftStickY, rightStickX, rightStickY);
@@ -113,12 +115,89 @@ public class BiobuzzFieldDrive {
         }
         throttle = wanted;
 
-        // --- Forward/back ramp, gentler when slowing down ---
+        rampDrive(wanted, dt);
+        turnAndCombine(dt);
+    }
+
+    // =========================================================
+    //  HEADING + DRIVE
+    // =========================================================
+
+    /**
+     * Right stick picks the heading (no movement), left stick drives forward/back, left trigger
+     * raises the top power. Pass the raw gamepad values (stick up is negative y).
+     */
+    public void updateHeadingArcade(double rightStickX, double rightStickY, double leftStickY,
+                                    double trigger, double heading, double dtSeconds) {
+        double dt = clampDt(dtSeconds);
+        prepare(heading, dt);
+
+        // --- Target heading from the right stick only; released, it holds the last heading ---
+        double rightMag = Math.hypot(rightStickX, rightStickY);
+        targetFrozen = false;
+        if (rightMag >= BiobuzzConstants.FD_STICK_DEADBAND) {
+            targetFrozen = isReleasing(rightMag, prevRightMag);
+            if (!targetFrozen) {
+                targetHeading = stickHeading(rightStickX, rightStickY);
+            }
+            activeStick = "RIGHT (heading)";
+        } else {
+            activeStick = "NONE (holding)";
+        }
+        prevRightMag = rightMag;
+
+        headingError = BiobuzzAutoDrive.normalizeDegrees(targetHeading - heading);
+        alignScale = 1.0;   // the sticks are independent, so driving is never cut for being off heading
+
+        // --- Speed from the left stick, topping out at ARCADE_MAX, raised toward 100% by the trigger ---
+        double stick = -leftStickY;
+        if (Math.abs(stick) < BiobuzzConstants.FD_ARCADE_DEADBAND) {
+            stick = 0.0;
+        }
+        double base = Math.max(0.0, Math.min(1.0, BiobuzzConstants.FD_ARCADE_MAX_POWER));
+        double t = Math.max(0.0, Math.min(1.0, trigger));
+        double top = base + (1.0 - base) * t;
+        double wanted = Math.max(-1.0, Math.min(1.0, stick * top));
+        throttle = wanted;
+
+        rampDrive(wanted, dt);
+        turnAndCombine(dt);
+    }
+
+    // =========================================================
+    //  SHARED
+    // =========================================================
+
+    private static double clampDt(double dtSeconds) {
+        return Math.max(0.001, Math.min(0.1, dtSeconds));
+    }
+
+    /** Starts holding the current heading if there is no target yet, and works out the turn rate. */
+    private void prepare(double heading, double dt) {
+        if (!hasTarget) {
+            holdHeadingNow(heading);
+        }
+
+        // Turn rate worked out from the heading, smoothed
+        if (hasLastHeading) {
+            double raw = BiobuzzAutoDrive.normalizeDegrees(heading - lastHeading) / dt;
+            turnRateDps += BiobuzzConstants.FD_RATE_FILTER * (raw - turnRateDps);
+        }
+        lastHeading = heading;
+        hasLastHeading = true;
+    }
+
+    /** Forward/back ramp, gentler when slowing down. */
+    private void rampDrive(double wanted, double dt) {
         boolean speedingUp = wanted * drivePower >= 0 && Math.abs(wanted) >= Math.abs(drivePower);
         double rate = speedingUp ? BiobuzzConstants.FD_ACCEL_RATE : BiobuzzConstants.FD_DECEL_RATE;
         drivePower = BiobuzzConstants.slew(drivePower, wanted, rate * dt);
+    }
 
-        // --- Turning: no ramp. A positive error means turn right. ---
+    /** Turns toward the target heading (a positive error means turn right) and combines with the drive. */
+    private void turnAndCombine(double dt) {
+        double absError = Math.abs(headingError);
+
         double turn = 0.0;
         if (absError > BiobuzzConstants.FD_TURN_TOLERANCE_DEG) {
             double base = BiobuzzConstants.FD_TURN_KP * headingError;
@@ -130,9 +209,18 @@ public class BiobuzzFieldDrive {
             turn = Math.max(-max, Math.min(max, turn));
         }
 
-        // --- Combine, normalizing if either side exceeds 1.0 ---
-        double left = drivePower + turn;
-        double right = drivePower - turn;
+        // Soften the start of a turn. Anything that lowers turning power (braking, reversing) is
+        // applied at once, so the damping is never delayed.
+        double rampRate = BiobuzzConstants.FD_TURN_RAMP_RATE;
+        if (rampRate > 0 && turn * turnOut >= 0 && Math.abs(turn) > Math.abs(turnOut)) {
+            turnOut = BiobuzzConstants.slew(turnOut, turn, rampRate * dt);
+        } else {
+            turnOut = turn;
+        }
+
+        // Combine, normalizing if either side exceeds 1.0
+        double left = drivePower + turnOut;
+        double right = drivePower - turnOut;
         double biggest = Math.max(Math.abs(left), Math.abs(right));
         if (biggest > 1.0) {
             left /= biggest;
@@ -143,8 +231,9 @@ public class BiobuzzFieldDrive {
     }
 
     /**
-     * Updates the target heading from the sticks. Returns +1 if the right stick (front) is in
-     * charge, -1 if the left stick (back) is, or 0 if neither is pushed past the deadband.
+     * Updates the target heading from the sticks (point and go). Returns +1 if the right stick
+     * (front) is in charge, -1 if the left stick (back) is, or 0 if neither is pushed past the
+     * deadband.
      */
     private int updateTargetFromSticks(double leftX, double leftY, double rightX, double rightY) {
         double rightMag = Math.hypot(rightX, rightY);

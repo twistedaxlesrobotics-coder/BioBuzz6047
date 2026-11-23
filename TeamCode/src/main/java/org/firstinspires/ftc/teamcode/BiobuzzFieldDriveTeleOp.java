@@ -5,15 +5,19 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 /**
- * Field-centric "point and go" teleop. Right stick points the front of the robot, left stick points
- * the back, and the left trigger is the accelerator. See BiobuzzFieldDrive for the details.
+ * Field-centric teleop with two drive versions, switched with Gamepad 1 D-pad right. See
+ * BiobuzzFieldDrive for the details.
  *
  * Needs the Pinpoint. If it is not found, the drivetrain stays off and a message is shown; use
  * Biobuzz Arcade Drive instead.
  *
- * Controls (Gamepad 1): right stick = front direction, left stick = back direction, left trigger =
- * accelerator, right trigger = gate, bumpers = aim at the goal (D-pad left switches to the fixed
- * headings), D-pad up/down = start/stop the shooter.
+ * Controls (Gamepad 1):
+ * - POINT AND GO (the default): right stick = front direction, left stick = back direction, left
+ *   trigger = accelerator.
+ * - HEADING + DRIVE: right stick = turn to a heading (no movement), left stick = forward/back
+ *   (top power 60%), left trigger = boost toward 100%.
+ * - Both: right trigger = gate, bumpers = aim at the goal (D-pad left switches them to the fixed
+ *   headings), D-pad up/down = start/stop the shooter, D-pad right = switch drive version.
  * Gamepad 2: bumpers = intake, D-pad up = reset the pose to the known reset position.
  */
 @TeleOp(name = "Biobuzz Field Drive", group = "Linear Opmode")
@@ -37,6 +41,10 @@ public class BiobuzzFieldDriveTeleOp extends LinearOpMode {
     BiobuzzHeadingHold headingHold = new BiobuzzHeadingHold();
     boolean xyAimMode = false;
     boolean prevDpadLeft = false;
+
+    // Drive version (Gamepad 1 D-pad right): false = point and go, true = heading + drive
+    boolean headingArcade = false;
+    boolean prevDpadRight = false;
     int assistSelection = 0;
     boolean prevAimLocked = false;
 
@@ -107,6 +115,15 @@ public class BiobuzzFieldDriveTeleOp extends LinearOpMode {
             if (pose == null) {
                 robot.setDrivePower(0, 0, 0, 0);
             } else {
+
+                // Drive version toggle (Gamepad 1 D-pad right): point and go, or heading + drive.
+                // The robot holds the heading it has, with fresh ramps, so nothing lurches.
+                if (gamepad1.dpad_right && !prevDpadRight) {
+                    headingArcade = !headingArcade;
+                    fieldDrive.holdHeadingNow(pose.getHeading());
+                    gamepad1.rumble(0.5, 0.5, 250);
+                }
+                prevDpadRight = gamepad1.dpad_right;
 
                 // Bumper mode toggle (Gamepad 1 D-pad left): aim at the goal, or the fixed headings
                 if (gamepad1.dpad_left && !prevDpadLeft) {
@@ -181,13 +198,23 @@ public class BiobuzzFieldDriveTeleOp extends LinearOpMode {
                     // fresh ramp, so control returns smoothly when the bumper is released
                     fieldDrive.holdHeadingNow(pose.getHeading());
                 } else {
-                    fieldDrive.update(
-                            gamepad1.left_stick_x, gamepad1.left_stick_y,
-                            gamepad1.right_stick_x, gamepad1.right_stick_y,
-                            gamepad1.left_trigger,
-                            pose.getHeading(),
-                            dt
-                    );
+                    if (headingArcade) {
+                        fieldDrive.updateHeadingArcade(
+                                gamepad1.right_stick_x, gamepad1.right_stick_y,
+                                gamepad1.left_stick_y,
+                                gamepad1.left_trigger,
+                                pose.getHeading(),
+                                dt
+                        );
+                    } else {
+                        fieldDrive.update(
+                                gamepad1.left_stick_x, gamepad1.left_stick_y,
+                                gamepad1.right_stick_x, gamepad1.right_stick_y,
+                                gamepad1.left_trigger,
+                                pose.getHeading(),
+                                dt
+                        );
+                    }
                     robot.setDrivePower(
                             fieldDrive.leftPower,
                             fieldDrive.leftPower,
@@ -232,7 +259,8 @@ public class BiobuzzFieldDriveTeleOp extends LinearOpMode {
 
             // --- Telemetry ---
 
-            telemetry.addData("Drive Mode", "Field Drive");
+            telemetry.addData("Drive Mode",
+                    headingArcade ? "HEADING + DRIVE" : "POINT AND GO");
 
             if (pose != null) {
                 pose.addPoseTelemetry();

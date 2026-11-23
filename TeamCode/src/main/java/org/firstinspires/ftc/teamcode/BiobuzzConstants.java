@@ -136,16 +136,34 @@ public class BiobuzzConstants {
     public static double FD_ALIGN_CUTOFF_DEG = 30.0;
     public static double FD_ALIGN_FULL_DEG = 5.0;
 
-    /** Turning: power per degree of heading error, and damping per degree/second of turn rate. */
-    public static double FD_TURN_KP = 0.030;
-    public static double FD_TURN_KD = 0.001;
+    /**
+     * Turning: power per degree of heading error, and damping per degree/second of turn rate.
+     * Turned down from the first values, which made the turning jerky.
+     */
+    public static double FD_TURN_KP = 0.018;
+    public static double FD_TURN_KD = 0.0015;
 
     /** Turning power limits. The minimum keeps it from crawling the last few degrees. */
-    public static double FD_TURN_MAX_POWER = 1.0;
-    public static double FD_TURN_MIN_POWER = 0.12;
+    public static double FD_TURN_MAX_POWER = 0.6;
+    public static double FD_TURN_MIN_POWER = 0.08;
+
+    /**
+     * Limits how fast turning power can build up, in power per second (0 = no limit). It only slows
+     * the start of a turn; braking is never delayed. Raise it for snappier turns.
+     */
+    public static double FD_TURN_RAMP_RATE = 6.0;
 
     /** The robot is on its heading within this many degrees, and stops turning. */
-    public static double FD_TURN_TOLERANCE_DEG = 2.0;
+    public static double FD_TURN_TOLERANCE_DEG = 2.5;
+
+    /**
+     * Heading + Drive version (right stick = heading, left stick = speed): the left stick's top power
+     * with the trigger untouched. The left trigger raises that top power toward 100%.
+     */
+    public static double FD_ARCADE_MAX_POWER = 0.6;
+
+    /** Heading + Drive version: the left stick must move past this (0 to 1) to drive. */
+    public static double FD_ARCADE_DEADBAND = 0.05;
 
     /** Forward/back power ramp, in power per second. Deceleration is gentler to stop the rocking. */
     public static double FD_ACCEL_RATE = 3.0;

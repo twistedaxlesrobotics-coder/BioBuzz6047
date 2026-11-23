@@ -5,8 +5,10 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 /**
- * Tunes the field drive live. Gamepad 1 drives exactly like Biobuzz Field Drive (right stick = front,
- * left stick = back, left trigger = accelerator). Gamepad 2 changes the settings:
+ * Tunes the field drive live. Gamepad 1 drives exactly like Biobuzz Field Drive: point and go (right
+ * stick = front, left stick = back, left trigger = accelerator), or heading + drive (right stick =
+ * heading, left stick = forward/back, left trigger = boost); D-pad right on Gamepad 1 switches.
+ * Gamepad 2 changes the settings:
  * - D-pad up / down: pick a setting (marked with &gt;)
  * - D-pad right / left: raise / lower the picked setting by its step
  * - X: reset the pose to the known reset position (and hold the new heading)
@@ -29,9 +31,11 @@ public class FieldDriveTuningOpMode extends LinearOpMode {
             "FD_TURN_MAX_POWER",
             "FD_TURN_MIN_POWER",
             "FD_TURN_TOLERANCE_DEG",
+            "FD_TURN_RAMP_RATE",
             "FD_ACCEL_RATE",
             "FD_DECEL_RATE",
-            "FD_RATE_FILTER"
+            "FD_RATE_FILTER",
+            "FD_ARCADE_MAX_POWER"
     };
 
     private static final double[] STEPS = {
@@ -45,9 +49,11 @@ public class FieldDriveTuningOpMode extends LinearOpMode {
             0.05,    // turn max power
             0.01,    // turn min power
             0.5,     // turn tolerance
+            1.0,     // turn ramp rate
             0.25,    // accel rate
             0.25,    // decel rate
-            0.05     // rate filter
+            0.05,    // rate filter
+            0.05     // heading + drive top power
     };
 
     BiobuzzHardware robot = new BiobuzzHardware();
@@ -57,6 +63,10 @@ public class FieldDriveTuningOpMode extends LinearOpMode {
 
     int selected = 0;
     boolean prevUp, prevDown, prevLeft, prevRight, prevX;
+
+    // Drive version (Gamepad 1 D-pad right): false = point and go, true = heading + drive
+    boolean headingArcade = false;
+    boolean prevDpadRight1 = false;
 
     @Override
     public void runOpMode() {
@@ -119,13 +129,29 @@ public class FieldDriveTuningOpMode extends LinearOpMode {
                     fieldDrive.holdHeadingNow(pose.getHeading());
                 }
 
-                fieldDrive.update(
-                        gamepad1.left_stick_x, gamepad1.left_stick_y,
-                        gamepad1.right_stick_x, gamepad1.right_stick_y,
-                        gamepad1.left_trigger,
-                        pose.getHeading(),
-                        dt
-                );
+                if (gamepad1.dpad_right && !prevDpadRight1) {
+                    headingArcade = !headingArcade;
+                    fieldDrive.holdHeadingNow(pose.getHeading());
+                }
+                prevDpadRight1 = gamepad1.dpad_right;
+
+                if (headingArcade) {
+                    fieldDrive.updateHeadingArcade(
+                            gamepad1.right_stick_x, gamepad1.right_stick_y,
+                            gamepad1.left_stick_y,
+                            gamepad1.left_trigger,
+                            pose.getHeading(),
+                            dt
+                    );
+                } else {
+                    fieldDrive.update(
+                            gamepad1.left_stick_x, gamepad1.left_stick_y,
+                            gamepad1.right_stick_x, gamepad1.right_stick_y,
+                            gamepad1.left_trigger,
+                            pose.getHeading(),
+                            dt
+                    );
+                }
                 robot.setDrivePower(
                         fieldDrive.leftPower,
                         fieldDrive.leftPower,
@@ -143,6 +169,7 @@ public class FieldDriveTuningOpMode extends LinearOpMode {
 
             if (pose != null) {
                 pose.addPoseTelemetry();
+                telemetry.addData("Drive Mode", headingArcade ? "HEADING + DRIVE" : "POINT AND GO");
                 telemetry.addData("Active Stick", fieldDrive.activeStick);
                 telemetry.addData("Target Heading", "%.1f%s", fieldDrive.targetHeading,
                         fieldDrive.targetFrozen ? " (frozen)" : "");
@@ -180,9 +207,11 @@ public class FieldDriveTuningOpMode extends LinearOpMode {
             case 7:  return BiobuzzConstants.FD_TURN_MAX_POWER;
             case 8:  return BiobuzzConstants.FD_TURN_MIN_POWER;
             case 9:  return BiobuzzConstants.FD_TURN_TOLERANCE_DEG;
-            case 10: return BiobuzzConstants.FD_ACCEL_RATE;
-            case 11: return BiobuzzConstants.FD_DECEL_RATE;
-            default: return BiobuzzConstants.FD_RATE_FILTER;
+            case 10: return BiobuzzConstants.FD_TURN_RAMP_RATE;
+            case 11: return BiobuzzConstants.FD_ACCEL_RATE;
+            case 12: return BiobuzzConstants.FD_DECEL_RATE;
+            case 13: return BiobuzzConstants.FD_RATE_FILTER;
+            default: return BiobuzzConstants.FD_ARCADE_MAX_POWER;
         }
     }
 
@@ -198,9 +227,11 @@ public class FieldDriveTuningOpMode extends LinearOpMode {
             case 7:  BiobuzzConstants.FD_TURN_MAX_POWER = value; break;
             case 8:  BiobuzzConstants.FD_TURN_MIN_POWER = value; break;
             case 9:  BiobuzzConstants.FD_TURN_TOLERANCE_DEG = value; break;
-            case 10: BiobuzzConstants.FD_ACCEL_RATE = value; break;
-            case 11: BiobuzzConstants.FD_DECEL_RATE = value; break;
-            default: BiobuzzConstants.FD_RATE_FILTER = value; break;
+            case 10: BiobuzzConstants.FD_TURN_RAMP_RATE = value; break;
+            case 11: BiobuzzConstants.FD_ACCEL_RATE = value; break;
+            case 12: BiobuzzConstants.FD_DECEL_RATE = value; break;
+            case 13: BiobuzzConstants.FD_RATE_FILTER = value; break;
+            default: BiobuzzConstants.FD_ARCADE_MAX_POWER = value; break;
         }
     }
 }
