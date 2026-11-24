@@ -19,6 +19,10 @@ public abstract class BiobuzzAutoBase extends LinearOpMode {
     protected final BiobuzzHardware robot = new BiobuzzHardware();
     protected BiobuzzAutoDrive drive;
 
+    /** AprilTag camera, used to correct the position just before the opening shot (null if off or missing). */
+    protected BiobuzzVision vision = null;
+    protected BiobuzzRelocalizer relocalizer = null;
+
     /** Time since the auto started (reset on START). */
     protected final ElapsedTime autoTimer = new ElapsedTime();
 
@@ -59,6 +63,17 @@ public abstract class BiobuzzAutoBase extends LinearOpMode {
         drive.init();   // calibrates the Pinpoint - keep the robot still
         drive.setStartPose(getStartX(), getStartY(), getStartHeading());
 
+        // The camera is optional: if it is off or missing, the auto runs without it
+        if (BiobuzzConstants.CAM_ENABLED_AUTO) {
+            try {
+                vision = new BiobuzzVision(hardwareMap);
+                relocalizer = new BiobuzzRelocalizer(vision, drive);
+            } catch (Exception e) {
+                vision = null;
+                relocalizer = null;
+            }
+        }
+
         telemetry.addData("Status", "Ready. Press START.");
         drive.addPoseTelemetry();
         telemetry.update();
@@ -77,6 +92,10 @@ public abstract class BiobuzzAutoBase extends LinearOpMode {
             // Save the final pose for teleop (also runs if the auto is stopped early)
             drive.update();
             PoseStore.save(drive.getX(), drive.getY(), drive.getHeading());
+
+            if (vision != null) {
+                vision.close();
+            }
         }
     }
 
@@ -104,7 +123,25 @@ public abstract class BiobuzzAutoBase extends LinearOpMode {
             return;
         }
         waitForShooterAtSpeed();
+        relocalizeBeforeShot();
         shoot();
+    }
+
+    /**
+     * Looks for a goal tag while the robot sits at the shot spot, and corrects the position from it.
+     * Gives up after CAM_AUTO_TIMEOUT_S and shoots anyway. Does nothing if there is no camera.
+     */
+    protected void relocalizeBeforeShot() {
+        if (relocalizer == null) return;
+
+        relocalizer.request(BiobuzzConstants.CAM_AUTO_TIMEOUT_S);
+        while (opModeIsActive() && relocalizer.isActive()) {
+            drive.update();
+            relocalizer.update();
+            robot.applyShooterPIDFWithVoltageComp();   // keep the shooter at speed while we look
+            idle();
+        }
+        telemetry.log().add("Camera: " + relocalizer.getStatus());
     }
 
     /** Waits, keeping the shooter at speed, until the auto timer reaches the given number of seconds. */

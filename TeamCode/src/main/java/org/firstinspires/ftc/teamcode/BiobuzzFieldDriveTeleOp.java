@@ -36,6 +36,12 @@ public class BiobuzzFieldDriveTeleOp extends LinearOpMode {
     BiobuzzFieldDrive fieldDrive = new BiobuzzFieldDrive();
     ElapsedTime driveTimer = new ElapsedTime();
 
+    // AprilTag camera: each time the gate opens it looks for a goal tag and corrects the position
+    // (null if the camera is turned off or not found)
+    BiobuzzVision vision = null;
+    BiobuzzRelocalizer relocalizer = null;
+    boolean prevGateOpen = false;
+
     // Bumper assist: 0 = off, 1 = left, 2 = right. Aim at the goal by default, or the fixed headings.
     BiobuzzSpotAim spotAim = null;
     BiobuzzHeadingHold headingHold = new BiobuzzHeadingHold();
@@ -68,6 +74,17 @@ public class BiobuzzFieldDriveTeleOp extends LinearOpMode {
         } catch (Exception e) {
             pose = null;
             spotAim = null;
+        }
+
+        // The camera is optional: if it is missing, the robot still drives
+        if (pose != null && BiobuzzConstants.CAM_ENABLED_TELEOP) {
+            try {
+                vision = new BiobuzzVision(hardwareMap);
+                relocalizer = new BiobuzzRelocalizer(vision, pose);
+            } catch (Exception e) {
+                vision = null;
+                relocalizer = null;
+            }
         }
 
         telemetry.addData("Status", "Initialized");
@@ -104,6 +121,17 @@ public class BiobuzzFieldDriveTeleOp extends LinearOpMode {
                 if (poseReset) {
                     fieldDrive.holdHeadingNow(pose.getHeading());
                 }
+
+                // Camera: each time the gate opens, look for a goal tag and correct the position.
+                // Only X and Y change, so the heading hold is not disturbed.
+                boolean gateOpen = gamepad1.right_trigger > BiobuzzConstants.GATE_TRIGGER_THRESHOLD;
+                if (relocalizer != null) {
+                    if (gateOpen && !prevGateOpen) {
+                        relocalizer.request(BiobuzzConstants.CAM_WINDOW_S);
+                    }
+                    relocalizer.update();
+                }
+                prevGateOpen = gateOpen;
             }
 
             double dt = driveTimer.seconds();
@@ -264,6 +292,9 @@ public class BiobuzzFieldDriveTeleOp extends LinearOpMode {
 
             if (pose != null) {
                 pose.addPoseTelemetry();
+                if (relocalizer != null) {
+                    relocalizer.addTelemetry(telemetry);
+                }
                 telemetry.addData("Bumper Mode",
                         xyAimMode ? "AIM AT GOAL (field point)" : "FIXED HEADING");
                 if (xyAimMode) {
@@ -301,6 +332,10 @@ public class BiobuzzFieldDriveTeleOp extends LinearOpMode {
                             ? "READY" : "WAITING");
 
             telemetry.update();
+        }
+
+        if (vision != null) {
+            vision.close();
         }
     }
 }

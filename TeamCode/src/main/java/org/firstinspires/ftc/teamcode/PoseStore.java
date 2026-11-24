@@ -10,8 +10,8 @@ package org.firstinspires.ftc.teamcode;
 public class PoseStore {
 
     /** Where the robot sits when the pose is reset by hand, and when no pose has been saved. */
-    public static final double RESET_X = 72.0;
-    public static final double RESET_Y = 9.0;
+    public static final double RESET_X = 0.0;
+    public static final double RESET_Y = -63.0;
     public static final double RESET_HEADING = 180.0;
 
     private static boolean hasPose = false;

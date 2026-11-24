@@ -11,8 +11,8 @@ import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
  * Simple autonomous driving for the tank drive, using the goBILDA Pinpoint for position and heading.
  *
  * Field coordinates (inches, degrees):
- * - Origin is the field corner at the left end of the driver wall.
- * - +X runs to the right along the driver wall, +Y runs away from the drivers.
+ * - Origin is the center of the field.
+ * - +X runs to the right (toward the right end of the driver wall), +Y runs away from the drivers.
  * - Heading 0 faces +Y (away from the drivers). Heading INCREASES TURNING RIGHT (clockwise),
  *   so 90 faces +X. Headings are kept in the range -180 to 180.
  *
@@ -148,6 +148,10 @@ public class BiobuzzAutoDrive {
     // Current robot pose in field coordinates
     private double x = 0, y = 0, heading = 0;
 
+    // Position corrections (from the camera), added on top of the Pinpoint position. They are
+    // cleared whenever setStartPose() is called.
+    private double corrX = 0, corrY = 0;
+
     // Heading the robot holds while driving: the start heading, then the last turn target
     private double holdHeading = 0;
 
@@ -195,7 +199,21 @@ public class BiobuzzAutoDrive {
         startHeading = normalizeDegrees(headingDegrees);
         holdHeading = startHeading;
         // The Pinpoint now counts from zero in the robot's starting orientation.
+        corrX = 0;
+        corrY = 0;
         pinpoint.setPosition(new Pose2D(DistanceUnit.INCH, 0, 0, AngleUnit.DEGREES, 0));
+        update();
+    }
+
+    /**
+     * Moves the field position to the given X and Y without touching the Pinpoint or the heading.
+     * Used for the camera correction. The correction is kept as an offset, and is cleared by
+     * setStartPose().
+     */
+    public void correctPosition(double newXInches, double newYInches) {
+        update();
+        corrX += newXInches - x;
+        corrY += newYInches - y;
         update();
     }
 
@@ -214,8 +232,8 @@ public class BiobuzzAutoDrive {
 
         double c = Math.cos(Math.toRadians(startHeading));
         double s = Math.sin(Math.toRadians(startHeading));
-        x = startX + px * c + py * s;
-        y = startY - px * s + py * c;
+        x = startX + corrX + px * c + py * s;
+        y = startY + corrY - px * s + py * c;
         heading = normalizeDegrees(startHeading - ph);
     }
 

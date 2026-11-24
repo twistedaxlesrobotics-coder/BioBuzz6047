@@ -79,17 +79,20 @@ public class BiobuzzConstants {
     //  are used only if the drive-to-spot version of the aim is started.
     // =========================================================
 
-    /** Right bumper: aim the back of the robot at the right goal (the spot is the old drive-to point). */
-    public static final double SPOT_RIGHT_X = 118.0;
-    public static final double SPOT_RIGHT_Y = 55.5;
-    public static final double GOAL_RIGHT_X = 92.0;
-    public static final double GOAL_RIGHT_Y = 58.0;
+    /**
+     * Right bumper: aim the back of the robot at the right goal (the spot is the old drive-to point).
+     * The goal is measured from the field center: 19 in to the right, 12.25 in toward the drivers.
+     */
+    public static final double SPOT_RIGHT_X = 46.0;
+    public static final double SPOT_RIGHT_Y = -16.5;
+    public static final double GOAL_RIGHT_X = 19.0;
+    public static final double GOAL_RIGHT_Y = -12.25;
 
-    /** Left bumper: the mirror image of the right side across the field center (x = 72). */
-    public static final double SPOT_LEFT_X = 23.0;
-    public static final double SPOT_LEFT_Y = 55.5;
-    public static final double GOAL_LEFT_X = 49.0;
-    public static final double GOAL_LEFT_Y = 59.0;
+    /** Left bumper: the mirror image of the right goal across the field center (x = 0). */
+    public static final double SPOT_LEFT_X = -49.0;
+    public static final double SPOT_LEFT_Y = -16.5;
+    public static final double GOAL_LEFT_X = -19.0;
+    public static final double GOAL_LEFT_Y = -12.25;
 
     /** How the Control Hub is mounted on the robot (for the hub IMU): logo faces left, USB ports point up. */
     public static final RevHubOrientationOnRobot.LogoFacingDirection HUB_LOGO_DIRECTION =
@@ -183,6 +186,78 @@ public class BiobuzzConstants {
 
     /** Smoothing for the turn rate worked out from the heading (0 to 1; higher = less smoothing). */
     public static double FD_RATE_FILTER = 0.4;
+
+    // =========================================================
+    //  CAMERA (APRILTAG RELOCALIZATION)
+    //  Each time the robot shoots, the camera looks for a goal tag and corrects the pose X/Y.
+    //  Heading is NOT corrected: the Pinpoint heading is trusted, and one tag gives a noisy heading.
+    // =========================================================
+
+    /** Turn the camera correction on or off in teleop (Field Drive) and in the autos. */
+    public static final boolean CAM_ENABLED_TELEOP = true;
+    public static final boolean CAM_ENABLED_AUTO = true;
+
+    /** Name of the webcam in the robot configuration, and the mode it runs in. */
+    public static final String CAM_NAME = "Webcam 1";
+    public static final int CAM_WIDTH = 640;
+    public static final int CAM_HEIGHT = 480;
+
+    /** Lens calibration for 640x480 from last season (fx, fy, cx, cy). Check it with Camera Check. */
+    public static final double CAM_FX = 539.0239404;
+    public static final double CAM_FY = 539.0239404;
+    public static final double CAM_CX = 316.450283269;
+    public static final double CAM_CY = 236.364794005;
+
+    /** Manual exposure (ms) and gain, from last season. Tune with a camera tuner if the tags are missed. */
+    public static final int CAM_EXPOSURE_MS = 1;
+    public static final int CAM_GAIN = 85;
+
+    /**
+     * Where the camera lens is on the robot, from the robot's center of rotation (inches).
+     * X: right is positive (the camera is on the LEFT, so negative). Y: forward is positive
+     * (the camera is BEHIND center, so negative). The camera points straight back, tilted up.
+     */
+    public static final double CAM_MOUNT_X_IN = -3.5;
+    public static final double CAM_MOUNT_Y_IN = -0.75;
+    public static final double CAM_MOUNT_HEIGHT_IN = 16.5;
+    public static final double CAM_TILT_UP_DEG = 45.0;
+
+    /**
+     * The goal AprilTags and where each tag's center is on the field (inches, field-center origin).
+     * CHECK THE IDS for this season. The positions start as NaN, which keeps the correction OFF
+     * until you fill them in: run Camera Check with the robot at a measured spot and copy the
+     * "tag field" numbers it shows.
+     */
+    public static final int[] CAM_TAG_IDS = {24, 20};
+    public static final double[] CAM_TAG_X = {Double.NaN, Double.NaN};
+    public static final double[] CAM_TAG_Y = {Double.NaN, Double.NaN};
+
+    /** After the gate opens, the camera has this long to get a fix (teleop), or this long before a shot (auto). */
+    public static final double CAM_WINDOW_S = 1.0;
+    public static final double CAM_AUTO_TIMEOUT_S = 0.8;
+
+    /** Frames averaged for one fix, and the least time between frames used (so a frame is not counted twice). */
+    public static final int CAM_FRAMES_NEEDED = 4;
+    public static final long CAM_SAMPLE_INTERVAL_MS = 35;
+
+    /** Ignore tags farther than this from the camera (inches). */
+    public static final double CAM_MAX_RANGE_IN = 110.0;
+
+    /** The frames must agree to within this (inches) or the fix is thrown out. */
+    public static final double CAM_MAX_SPREAD_IN = 2.0;
+
+    /** A correction bigger than this (inches) is rejected as a bad reading. */
+    public static final double CAM_MAX_JUMP_IN = 12.0;
+
+    /** A correction smaller than this (inches) is not worth applying. */
+    public static final double CAM_MIN_CORRECTION_IN = 0.5;
+
+    /** How much of the correction to apply: 1.0 = jump to the camera position, lower = move partway. */
+    public static final double CAM_BLEND = 1.0;
+
+    /** The robot counts as still when it moves slower than this (inches/second) and turns slower than this (degrees/second). */
+    public static final double CAM_STILL_SPEED_IN_S = 4.0;
+    public static final double CAM_STILL_TURN_DPS = 20.0;
 
     // =========================================================
     //  HELPERS
