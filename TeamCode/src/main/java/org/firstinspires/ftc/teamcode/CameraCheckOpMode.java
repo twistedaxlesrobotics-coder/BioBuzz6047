@@ -21,7 +21,8 @@ import java.util.Map;
  *      X = your own spot, typed into CAM_LEARN_X / CAM_LEARN_Y / CAM_LEARN_HEADING.
  *    The software cannot tell where the robot really is, so it is only as accurate as your placement.
  * 3. Aim the camera so it sees the tags, and HOLD B for about two seconds, then let go.
- *    Every visible tag from the red hive sets (BiobuzzConstants) is learned and saved on the robot.
+ *    Every visible red-alliance hive is learned and saved on the robot. The SDK may report a hive as
+ *    a single named "cluster" (such as "red audience") or as separate tags; both are handled.
  * 4. Do it again from another spot to pick up tags it could not see, or to check them. A tag that is
  *    learned again is replaced.
  *
@@ -48,8 +49,8 @@ public class CameraCheckOpMode extends LinearOpMode {
     boolean prevB = false;
     boolean prevClear = false;
 
-    // While B is held: tag id -> {sum x, sum y, frames}
-    final Map<Integer, double[]> learning = new HashMap<>();
+    // While B is held: tag number or cluster name -> {sum x, sum y, frames}
+    final Map<String, double[]> learning = new HashMap<>();
     String learnMessage = "Hold B to learn the visible tags";
 
     @Override
@@ -133,10 +134,14 @@ public class CameraCheckOpMode extends LinearOpMode {
 
                 List<BiobuzzVision.Observation> seen = vision.observe();
                 boolean holdingB = gamepad1.b;
+                boolean weakView = false;   // a cluster is in view but too little of it to learn from
 
                 for (BiobuzzVision.Observation o : seen) {
-                    String name = "Tag " + o.id;
+                    String name = o.cluster ? "Cluster " + o.key : "Tag " + o.id;
                     telemetry.addData(name + " range / bearing", "%.1f in / %.1f deg", o.range, o.bearing);
+                    if (o.cluster) {
+                        telemetry.addData(name + " tags found", "%d percent", o.percentFound);
+                    }
 
                     if (pose == null) continue;
                     double h = pose.getHeading();
@@ -144,21 +149,25 @@ public class CameraCheckOpMode extends LinearOpMode {
                     telemetry.addData(name + " field position now", "x %.1f, y %.1f", tag[0], tag[1]);
 
                     // Collect frames while B is held
-                    if (holdingB && BiobuzzRelocalizer.contains(
-                            BiobuzzRelocalizer.idsForSide(BiobuzzRelocalizer.SIDE_ANY), o.id)) {
-                        double[] acc = learning.get(o.id);
+                    boolean goodEnough = !o.cluster
+                            || o.percentFound >= BiobuzzConstants.CAM_LEARN_MIN_CLUSTER_PERCENT;
+                    if (holdingB && BiobuzzRelocalizer.isLearnable(o) && !goodEnough) {
+                        weakView = true;
+                    }
+                    if (holdingB && BiobuzzRelocalizer.isLearnable(o) && goodEnough) {
+                        double[] acc = learning.get(o.key);
                         if (acc == null) {
                             acc = new double[3];
-                            learning.put(o.id, acc);
+                            learning.put(o.key, acc);
                         }
                         acc[0] += tag[0];
                         acc[1] += tag[1];
                         acc[2] += 1;
                     }
 
-                    if (BiobuzzTagMap.known(o.id)) {
+                    if (BiobuzzTagMap.known(o.key)) {
                         double[] est = BiobuzzRelocalizer.robotFromTag(
-                                BiobuzzTagMap.x(o.id), BiobuzzTagMap.y(o.id), h, o);
+                                BiobuzzTagMap.x(o.key), BiobuzzTagMap.y(o.key), h, o);
                         telemetry.addData(name + " Robot from tag", "x %.1f, y %.1f", est[0], est[1]);
                         telemetry.addData(name + " Error vs pose", "dx %.1f, dy %.1f in",
                                 est[0] - pose.getX(), est[1] - pose.getY());
@@ -173,7 +182,7 @@ public class CameraCheckOpMode extends LinearOpMode {
                 // B released: keep the tags that were seen for long enough
                 if (!holdingB && prevB) {
                     int learned = 0;
-                    for (Map.Entry<Integer, double[]> entry : learning.entrySet()) {
+                    for (Map.Entry<String, double[]> entry : learning.entrySet()) {
                         double[] acc = entry.getValue();
                         if (acc[2] >= MIN_LEARN_FRAMES) {
                             BiobuzzTagMap.learn(entry.getKey(), acc[0] / acc[2], acc[1] / acc[2]);
@@ -190,7 +199,9 @@ public class CameraCheckOpMode extends LinearOpMode {
                 }
                 prevB = holdingB;
                 if (holdingB) {
-                    learnMessage = "Learning... keep the robot still and the tags in view";
+                    learnMessage = weakView
+                            ? "Learning... but too little of the hive is in view, so some of it is skipped. Reposition so more tags show"
+                            : "Learning... keep the robot still and the tags in view";
                 }
             }
 

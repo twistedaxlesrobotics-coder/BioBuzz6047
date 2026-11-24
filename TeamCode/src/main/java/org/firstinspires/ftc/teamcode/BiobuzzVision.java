@@ -29,9 +29,16 @@ import java.util.concurrent.TimeUnit;
  */
 public class BiobuzzVision {
 
-    /** One tag the camera can see right now, with its position relative to the robot center. */
+    /** One tag, or one cluster of tags, the camera can see right now, relative to the robot center. */
     public static class Observation {
+        /** The tag number for a single tag, or -1 for a cluster. */
         public int id;
+        /** The name used to look it up in BiobuzzTagMap: the tag number for a tag, the cluster name for a cluster. */
+        public String key;
+        /** True for a cluster (a whole hive that the SDK reports as one object). */
+        public boolean cluster;
+        /** For a cluster: the percent of its tags the camera found. */
+        public int percentFound;
         /** Distance from the camera to the tag, and the bearing to it from the camera's centerline. */
         public double range;
         public double bearing;
@@ -95,17 +102,29 @@ public class BiobuzzVision {
         double sinTilt = Math.sin(tilt);
 
         for (AprilTagDetection detection : detections) {
-            if (!(detection instanceof AprilTagSingleDetection)) continue;
-            AprilTagSingleDetection single = (AprilTagSingleDetection) detection;
-            if (single.metadata == null || single.ftcPose == null) continue;
-
             Observation o = new Observation();
-            o.id = single.id;
-            o.range = single.ftcPose.range;
-            o.bearing = single.ftcPose.bearing;
-            o.camX = single.ftcPose.x;
-            o.camY = single.ftcPose.y;
-            o.camZ = single.ftcPose.z;
+            if (detection instanceof AprilTagSingleDetection) {
+                AprilTagSingleDetection single = (AprilTagSingleDetection) detection;
+                if (single.metadata == null || single.ftcPose == null) continue;
+                o.id = single.id;
+                o.key = String.valueOf(single.id);
+                o.cluster = false;
+            } else if (detection instanceof AprilTagClusterDetection) {
+                AprilTagClusterDetection cluster = (AprilTagClusterDetection) detection;
+                if (cluster.metadata == null || cluster.ftcPose == null) continue;
+                o.id = -1;
+                o.key = String.valueOf(cluster.metadata.name);
+                o.cluster = true;
+                o.percentFound = (int) cluster.percentClusterFound;
+            } else {
+                continue;
+            }
+
+            o.range = detection.ftcPose.range;
+            o.bearing = detection.ftcPose.bearing;
+            o.camX = detection.ftcPose.x;
+            o.camY = detection.ftcPose.y;
+            o.camZ = detection.ftcPose.z;
 
             // The SDK gives the tag relative to the camera: x right, y straight out of the lens, z up.
             // Tilting the camera up by the tilt angle, the distance along the floor away from the

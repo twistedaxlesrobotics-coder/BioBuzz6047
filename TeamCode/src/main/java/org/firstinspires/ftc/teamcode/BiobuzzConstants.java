@@ -268,6 +268,20 @@ public class BiobuzzConstants {
     public static final int CAM_FRAMES_NEEDED = 4;
     public static final long CAM_SAMPLE_INTERVAL_MS = 35;
 
+    /**
+     * The SDK reports a whole hive as one named "cluster" (for example "red audience"), and a cluster
+     * gives the same reference point for the hive even when only some of its tags are in view.
+     * - MIN: a cluster is used when the camera found at least this percent of its tags. 1 means it
+     *   still works when only one tag is seen.
+     * - STRONG: a cluster found at least this much counts as two tags of evidence, so it may move the
+     *   position up to CAM_MAX_JUMP_IN. A weaker view counts as one tag (CAM_SINGLE_TAG_MAX_JUMP_IN).
+     * - LEARN_MIN: Camera Check only learns a cluster's position from a view at least this good,
+     *   because that position is what everything else is measured against.
+     */
+    public static final int CAM_MIN_CLUSTER_PERCENT = 1;
+    public static final int CAM_STRONG_CLUSTER_PERCENT = 50;
+    public static final int CAM_LEARN_MIN_CLUSTER_PERCENT = 50;
+
     /** Ignore tags farther than this from the camera (inches). */
     public static final double CAM_MAX_RANGE_IN = 110.0;
 

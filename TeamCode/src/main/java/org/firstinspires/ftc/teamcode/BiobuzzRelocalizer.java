@@ -150,19 +150,20 @@ public class BiobuzzRelocalizer {
         if ((now - lastSampleNs) < BiobuzzConstants.CAM_SAMPLE_INTERVAL_MS * 1000000L) return;
 
         // Where does each usable tag say the robot is?
-        int[] allowed = idsForSide(side);
         List<BiobuzzVision.Observation> seen = vision.observe();
         List<double[]> estimates = new ArrayList<>();
+        int evidence = 0;
         for (BiobuzzVision.Observation o : seen) {
-            if (!contains(allowed, o.id)) continue;
-            if (!BiobuzzTagMap.known(o.id)) continue;
+            if (!usableForSide(o, side)) continue;
+            if (!BiobuzzTagMap.known(o.key)) continue;
             if (o.range > BiobuzzConstants.CAM_MAX_RANGE_IN) continue;
-            estimates.add(robotFromTag(BiobuzzTagMap.x(o.id), BiobuzzTagMap.y(o.id), h, o));
+            estimates.add(robotFromTag(BiobuzzTagMap.x(o.key), BiobuzzTagMap.y(o.key), h, o));
+            evidence += evidenceOf(o);
         }
         if (estimates.isEmpty()) {
             status = seen.isEmpty()
                     ? "LOOKING (no tag in view)"
-                    : "LOOKING (no learned tag for this side in view)";
+                    : "LOOKING (nothing learned for this side in view)";
             return;
         }
         lastSampleNs = now;
@@ -187,7 +188,7 @@ public class BiobuzzRelocalizer {
             }
         }
 
-        fewestTags = (count == 0) ? estimates.size() : Math.min(fewestTags, estimates.size());
+        fewestTags = (count == 0) ? evidence : Math.min(fewestTags, evidence);
         sampleX[count] = frameX;
         sampleY[count] = frameY;
         count++;
@@ -273,6 +274,42 @@ public class BiobuzzRelocalizer {
             if (candidate == id) return true;
         }
         return false;
+    }
+
+    /**
+     * Can this tag or cluster be used for a shot to this side? A single tag must be one of that hive's
+     * tags. A cluster must be an alliance cluster (its name starts with "red" or "blue") that the camera
+     * found enough of, and for a left or right shot it must be on that half of the field, from where it
+     * was learned (left is X below 0, right is X above 0).
+     */
+    public static boolean usableForSide(BiobuzzVision.Observation o, int side) {
+        if (!o.cluster) {
+            return contains(idsForSide(side), o.id);
+        }
+        if (!matchesAlliance(o)) return false;
+        if (o.percentFound < BiobuzzConstants.CAM_MIN_CLUSTER_PERCENT) return false;
+        if (side == SIDE_ANY) return true;
+        if (!BiobuzzTagMap.known(o.key)) return false;
+        double fieldX = BiobuzzTagMap.x(o.key);
+        return side == SIDE_LEFT ? fieldX < 0 : fieldX > 0;
+    }
+
+    /** Should Camera Check learn this one? Any of our hive tags, or any cluster of our alliance. */
+    public static boolean isLearnable(BiobuzzVision.Observation o) {
+        if (o.cluster) return matchesAlliance(o);
+        return contains(idsForSide(SIDE_ANY), o.id);
+    }
+
+    /** How much a reading counts for: a single tag is 1, a cluster that found at least the strong percent is 2. */
+    private static int evidenceOf(BiobuzzVision.Observation o) {
+        if (o.cluster && o.percentFound >= BiobuzzConstants.CAM_STRONG_CLUSTER_PERCENT) return 2;
+        return 1;
+    }
+
+    /** True if a cluster's name starts with our alliance color. */
+    private static boolean matchesAlliance(BiobuzzVision.Observation o) {
+        String name = o.key == null ? "" : o.key.toLowerCase();
+        return name.startsWith(BiobuzzConstants.ALLIANCE_IS_RED ? "red" : "blue");
     }
 
     /**
