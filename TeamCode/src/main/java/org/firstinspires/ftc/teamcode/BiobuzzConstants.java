@@ -222,15 +222,43 @@ public class BiobuzzConstants {
     public static final double CAM_MOUNT_HEIGHT_IN = 16.5;
     public static final double CAM_TILT_UP_DEG = 45.0;
 
+    /** Which alliance we are. Only red is set up so far. */
+    public static final boolean ALLIANCE_IS_RED = true;
+
     /**
-     * The goal AprilTags and where each tag's center is on the field (inches, field-center origin).
-     * CHECK THE IDS for this season. The positions start as NaN, which keeps the correction OFF
-     * until you fill them in: run Camera Check with the robot at a measured spot and copy the
-     * "tag field" numbers it shows.
+     * The four AprilTags on the underside of each hive, for shooting to the left and to the right
+     * (red alliance). The left bumper uses the left tags and the right bumper the right tags.
+     * Where each tag IS on the field is not typed in: Camera Check learns it from a known spot with
+     * the hive up, and saves it on the robot. Until a tag is learned it is not used.
      */
-    public static final int[] CAM_TAG_IDS = {24, 20};
-    public static final double[] CAM_TAG_X = {Double.NaN, Double.NaN};
-    public static final double[] CAM_TAG_Y = {Double.NaN, Double.NaN};
+    public static final int[] CAM_RED_LEFT_TAGS = {30, 31, 32, 33};
+    public static final int[] CAM_RED_RIGHT_TAGS = {34, 35, 36, 37};
+
+    /**
+     * PLACEHOLDERS for blue: fill in the tag numbers when blue is sorted out, then set
+     * ALLIANCE_IS_RED to false. Empty means no tags, so the camera does nothing for blue.
+     */
+    public static final int[] CAM_BLUE_LEFT_TAGS = {};
+    public static final int[] CAM_BLUE_RIGHT_TAGS = {};
+
+    /**
+     * Where the robot is placed at the start of each auto (field center origin, inches and degrees).
+     * The autos and Camera Check both use these, so they stay the same place.
+     */
+    public static final double START_RIGHT_X = 59.5;
+    public static final double START_RIGHT_Y = -14.5;
+    public static final double START_RIGHT_HEADING = 90.0;
+    public static final double START_LEFT_X = -59.5;
+    public static final double START_LEFT_Y = -14.5;
+    public static final double START_LEFT_HEADING = -90.0;
+
+    /**
+     * A third spot for Camera Check to learn tags from: any spot you can place the robot at exactly.
+     * Leave X and Y as NaN to leave it unused. Heading is in the field frame (0 faces +Y, clockwise).
+     */
+    public static final double CAM_LEARN_X = Double.NaN;
+    public static final double CAM_LEARN_Y = Double.NaN;
+    public static final double CAM_LEARN_HEADING = 0.0;
 
     /** After the gate opens, the camera has this long to get a fix (teleop), or this long before a shot (auto). */
     public static final double CAM_WINDOW_S = 1.0;
@@ -248,6 +276,15 @@ public class BiobuzzConstants {
 
     /** A correction bigger than this (inches) is rejected as a bad reading. */
     public static final double CAM_MAX_JUMP_IN = 12.0;
+
+    /** A fix from only ONE tag is rejected if it moves the robot more than this (inches). */
+    public static final double CAM_SINGLE_TAG_MAX_JUMP_IN = 6.0;
+
+    /**
+     * Tags seen together in one frame must agree on where the robot is within this (inches), or the
+     * frame is skipped. A hive that is not in its normal up position makes them disagree.
+     */
+    public static final double CAM_MAX_TAG_DISAGREE_IN = 3.0;
 
     /** A correction smaller than this (inches) is not worth applying. */
     public static final double CAM_MIN_CORRECTION_IN = 0.5;

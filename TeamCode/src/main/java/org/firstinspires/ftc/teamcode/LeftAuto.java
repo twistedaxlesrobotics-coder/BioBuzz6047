@@ -27,9 +27,9 @@ public class LeftAuto extends BiobuzzAutoBase {
      */
     private static final double END_TIMEOUT_S = 6.0;
 
-    @Override protected double getStartX() { return -59.5; }
-    @Override protected double getStartY() { return -14.5; }
-    @Override protected double getStartHeading() { return -90.0; }
+    @Override protected double getStartX() { return BiobuzzConstants.START_LEFT_X; }
+    @Override protected double getStartY() { return BiobuzzConstants.START_LEFT_Y; }
+    @Override protected double getStartHeading() { return BiobuzzConstants.START_LEFT_HEADING; }
 
     @Override protected double getShotX() { return -46.0; }
     @Override protected double getShotY() { return -14.5; }
@@ -37,6 +37,9 @@ public class LeftAuto extends BiobuzzAutoBase {
     @Override protected double getEarliestShotSeconds() { return SHOT_DELAY_S; }
 
     @Override protected BiobuzzAutoDrive.MoveSpeed getMoveSpeed() { return SPEED; }
+
+    /** The opening shot goes to the left hive, so the camera uses the left hive's tags. */
+    @Override protected int getCameraSide() { return BiobuzzRelocalizer.SIDE_LEFT; }
 
     @Override
     protected void runRoute() {

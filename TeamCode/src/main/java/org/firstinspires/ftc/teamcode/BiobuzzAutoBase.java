@@ -44,6 +44,14 @@ public abstract class BiobuzzAutoBase extends LinearOpMode {
     }
 
     /**
+     * Which hive the opening shot goes to, so the camera uses that hive's tags: one of
+     * BiobuzzRelocalizer.SIDE_LEFT, SIDE_RIGHT or SIDE_ANY. An auto overrides this.
+     */
+    protected int getCameraSide() {
+        return BiobuzzRelocalizer.SIDE_ANY;
+    }
+
+    /**
      * Seconds after START before the opening shot may fire. The robot still drives to the shot spot
      * and spins the shooter up straight away, then waits here. An auto can override this to delay
      * its shot.
@@ -134,7 +142,7 @@ public abstract class BiobuzzAutoBase extends LinearOpMode {
     protected void relocalizeBeforeShot() {
         if (relocalizer == null) return;
 
-        relocalizer.request(BiobuzzConstants.CAM_AUTO_TIMEOUT_S);
+        relocalizer.request(BiobuzzConstants.CAM_AUTO_TIMEOUT_S, getCameraSide());
         while (opModeIsActive() && relocalizer.isActive()) {
             drive.update();
             relocalizer.update();

@@ -46,6 +46,12 @@ public class BiobuzzTankDrive extends LinearOpMode {
     boolean xyAimMode = false;
     boolean prevDpadLeft = false;
 
+    // AprilTag camera: each time the gate opens it looks for a goal tag and corrects the position
+    // (null if the camera is turned off or not found)
+    BiobuzzVision vision = null;
+    BiobuzzRelocalizer relocalizer = null;
+    boolean prevGateOpen = false;
+
     // Field heading for the hold comes from the hub IMU: heading = -yaw + offset (null if no IMU)
     IMU imu = null;
     double imuHeadingOffset = 0.0;
@@ -74,6 +80,17 @@ public class BiobuzzTankDrive extends LinearOpMode {
         } catch (Exception e) {
             pose = null;
             spotAim = null;
+        }
+
+        // The camera is optional: if it is missing, the robot still drives
+        if (pose != null && BiobuzzConstants.CAM_ENABLED_TELEOP) {
+            try {
+                vision = new BiobuzzVision(hardwareMap);
+                relocalizer = new BiobuzzRelocalizer(vision, pose);
+            } catch (Exception e) {
+                vision = null;
+                relocalizer = null;
+            }
         }
 
         // Start the hub IMU at the heading the auto ended with (or the reset heading)
@@ -131,6 +148,19 @@ public class BiobuzzTankDrive extends LinearOpMode {
 
                 pose.update();
                 PoseStore.save(pose.getX(), pose.getY(), pose.getHeading());
+
+                // Camera: each time the gate opens, look for a goal tag and correct the position.
+                // Only X and Y change, so the IMU heading hold is not disturbed.
+                boolean gateOpen = gamepad1.right_trigger > BiobuzzConstants.GATE_TRIGGER_THRESHOLD;
+                if (relocalizer != null) {
+                    if (gateOpen && !prevGateOpen) {
+                        // The bumper being held says which hive we are shooting at
+                        relocalizer.request(BiobuzzConstants.CAM_WINDOW_S,
+                                BiobuzzRelocalizer.sideFromBumper(assistSelection));
+                    }
+                    relocalizer.update();
+                }
+                prevGateOpen = gateOpen;
             }
 
 
@@ -395,6 +425,9 @@ public class BiobuzzTankDrive extends LinearOpMode {
 
             if (pose != null) {
                 pose.addPoseTelemetry();
+                if (relocalizer != null) {
+                    relocalizer.addTelemetry(telemetry);
+                }
                 telemetry.addData("Bumper Mode",
                         xyAimMode ? "AIM AT GOAL (field point)" : "FIXED HEADING");
                 if (xyAimMode && spotAim != null) {
@@ -430,6 +463,10 @@ public class BiobuzzTankDrive extends LinearOpMode {
             );
 
             telemetry.update();
+        }
+
+        if (vision != null) {
+            vision.close();
         }
     }
 

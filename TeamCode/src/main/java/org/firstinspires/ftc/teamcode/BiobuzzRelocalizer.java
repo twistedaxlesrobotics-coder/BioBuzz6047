@@ -2,25 +2,35 @@ package org.firstinspires.ftc.teamcode;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * BiobuzzRelocalizer
- * Corrects the robot's field X/Y from a goal AprilTag each time the robot shoots.
+ * Corrects the robot's field X/Y from the hive AprilTags each time the robot shoots.
  *
- * Call request() when a shot starts (the gate opens), and update() every loop after the pose has
- * been updated. While the request is open it waits for the robot to be still, takes several camera
- * frames of the same tag, and works out where the robot must be from where the tag is. If the frames
- * agree and the correction is not suspiciously large, it moves the pose there. Otherwise nothing
- * changes and the status says why.
+ * Call request() when a shot starts (the gate opens), saying which side the robot is shooting to,
+ * and update() every loop after the pose has been updated. While the request is open it waits for
+ * the robot to be still, takes several camera frames, and works out where the robot must be from
+ * where the tags are (BiobuzzTagMap). Only the four tags of the hive on the shooting side are used.
  *
- * Only X and Y are corrected. The heading comes from the Pinpoint, and is used to turn the tag's
+ * Safety checks, so a bad reading does nothing instead of moving the robot the wrong way:
+ * - The robot must be still.
+ * - Tags seen together in one frame must agree on the robot's position, or the frame is skipped
+ *   (a hive that is not in its normal up position makes them disagree).
+ * - Several frames must agree with each other.
+ * - A fix from only one tag may move the robot a little; several agreeing tags may move it more.
+ * If any check fails, the position is left alone and the status says why.
+ *
+ * Only X and Y are corrected. The heading comes from the Pinpoint, and is used to turn a tag's
  * position on the robot into a position on the field.
- *
- * The correction stays OFF for any tag whose field position in BiobuzzConstants (CAM_TAG_X/Y) is
- * still NaN.
  */
 public class BiobuzzRelocalizer {
+
+    /** Which hive the robot is shooting at. */
+    public static final int SIDE_ANY = 0;
+    public static final int SIDE_LEFT = 1;
+    public static final int SIDE_RIGHT = 2;
 
     private final BiobuzzVision vision;
     private final BiobuzzAutoDrive drive;
@@ -29,12 +39,13 @@ public class BiobuzzRelocalizer {
     private boolean active = false;
     private long windowStartNs = 0;
     private long windowNs = 0;
+    private int side = SIDE_ANY;
 
-    // Samples of one tag
+    // Frames collected for one fix
     private final double[] sampleX = new double[BiobuzzConstants.CAM_FRAMES_NEEDED];
     private final double[] sampleY = new double[BiobuzzConstants.CAM_FRAMES_NEEDED];
     private int count = 0;
-    private int sampleTagId = -1;
+    private int fewestTags = 0;
     private long lastSampleNs = 0;
 
     // Is the robot still? Worked out from how the pose changes between calls.
@@ -51,10 +62,18 @@ public class BiobuzzRelocalizer {
     public BiobuzzRelocalizer(BiobuzzVision vision, BiobuzzAutoDrive drive) {
         this.vision = vision;
         this.drive = drive;
+        BiobuzzTagMap.load();
     }
 
-    /** Starts looking for a tag. The camera has windowSeconds to get a fix. */
-    public void request(double windowSeconds) {
+    /** The shooting side for a bumper: 1 = left bumper, 2 = right bumper, anything else = either side. */
+    public static int sideFromBumper(int bumper) {
+        if (bumper == 1) return SIDE_LEFT;
+        if (bumper == 2) return SIDE_RIGHT;
+        return SIDE_ANY;
+    }
+
+    /** Starts looking for tags. The camera has windowSeconds to get a fix. */
+    public void request(double windowSeconds, int shootingSide) {
         if (vision == null) {
             status = "NO CAMERA";
             return;
@@ -62,8 +81,9 @@ public class BiobuzzRelocalizer {
         active = true;
         windowStartNs = System.nanoTime();
         windowNs = (long) (windowSeconds * 1e9);
+        side = shootingSide;
         count = 0;
-        sampleTagId = -1;
+        fewestTags = 0;
         lastSampleNs = 0;
         status = "LOOKING";
     }
@@ -113,7 +133,9 @@ public class BiobuzzRelocalizer {
         // Out of time
         if (now - windowStartNs > windowNs) {
             active = false;
-            status = count > 0 ? "NO FIX (frames did not settle)" : "NO FIX (no usable tag)";
+            if (!status.startsWith("REJECTED")) {
+                status = count > 0 ? "NO FIX (frames did not settle)" : "NO FIX (no usable tag)";
+            }
             return;
         }
 
@@ -127,34 +149,52 @@ public class BiobuzzRelocalizer {
         // Do not count the same camera frame twice
         if ((now - lastSampleNs) < BiobuzzConstants.CAM_SAMPLE_INTERVAL_MS * 1000000L) return;
 
-        // Pick the nearest configured tag whose field position is known
+        // Where does each usable tag say the robot is?
+        int[] allowed = idsForSide(side);
         List<BiobuzzVision.Observation> seen = vision.observe();
-        BiobuzzVision.Observation best = null;
+        List<double[]> estimates = new ArrayList<>();
         for (BiobuzzVision.Observation o : seen) {
-            if (!tagKnown(o.id)) continue;
+            if (!contains(allowed, o.id)) continue;
+            if (!BiobuzzTagMap.known(o.id)) continue;
             if (o.range > BiobuzzConstants.CAM_MAX_RANGE_IN) continue;
-            if (best == null || o.range < best.range) best = o;
+            estimates.add(robotFromTag(BiobuzzTagMap.x(o.id), BiobuzzTagMap.y(o.id), h, o));
         }
-        if (best == null) {
-            status = seen.isEmpty() ? "LOOKING (no tag in view)" : "LOOKING (tag not configured or too far)";
+        if (estimates.isEmpty()) {
+            status = seen.isEmpty()
+                    ? "LOOKING (no tag in view)"
+                    : "LOOKING (no learned tag for this side in view)";
             return;
         }
         lastSampleNs = now;
 
-        // Frames from a different tag do not mix
-        if (best.id != sampleTagId) {
-            sampleTagId = best.id;
-            count = 0;
+        // The tags in this frame must agree with each other
+        double frameX = 0, frameY = 0;
+        for (double[] e : estimates) {
+            frameX += e[0];
+            frameY += e[1];
+        }
+        frameX /= estimates.size();
+        frameY /= estimates.size();
+        if (estimates.size() >= 2) {
+            double worst = 0;
+            for (double[] e : estimates) {
+                worst = Math.max(worst, Math.hypot(e[0] - frameX, e[1] - frameY));
+            }
+            if (worst > BiobuzzConstants.CAM_MAX_TAG_DISAGREE_IN) {
+                count = 0;
+                status = String.format("REJECTED (tags disagree by %.1f in)", worst);
+                return;   // keep looking until the window ends
+            }
         }
 
-        double[] est = robotFromTag(tagX(best.id), tagY(best.id), h, best);
-        sampleX[count] = est[0];
-        sampleY[count] = est[1];
+        fewestTags = (count == 0) ? estimates.size() : Math.min(fewestTags, estimates.size());
+        sampleX[count] = frameX;
+        sampleY[count] = frameY;
         count++;
         status = "LOOKING (frames " + count + "/" + sampleX.length + ")";
         if (count < sampleX.length) return;
 
-        // Enough frames: do they agree?
+        // Enough frames: do they agree with each other?
         double meanX = 0, meanY = 0;
         for (int i = 0; i < count; i++) {
             meanX += sampleX[i];
@@ -172,11 +212,15 @@ public class BiobuzzRelocalizer {
             return;   // keep looking until the window ends
         }
 
-        // Is the correction believable?
+        // Is the correction believable? One tag may only move the robot a little.
         double jump = Math.hypot(meanX - x, meanY - y);
+        double limit = fewestTags >= 2
+                ? BiobuzzConstants.CAM_MAX_JUMP_IN
+                : BiobuzzConstants.CAM_SINGLE_TAG_MAX_JUMP_IN;
         active = false;
-        if (jump > BiobuzzConstants.CAM_MAX_JUMP_IN) {
-            status = String.format("REJECTED (%.1f in off, too big)", jump);
+        if (jump > limit) {
+            status = String.format("REJECTED (%.1f in off, limit %.0f with %d tag%s)",
+                    jump, limit, fewestTags, fewestTags == 1 ? "" : "s");
             return;
         }
         if (jump < BiobuzzConstants.CAM_MIN_CORRECTION_IN) {
@@ -191,7 +235,8 @@ public class BiobuzzRelocalizer {
         drive.correctPosition(newX, newY);
         lastDx = newX - x;
         lastDy = newY - y;
-        status = String.format("CORRECTED (%.1f, %.1f in)", lastDx, lastDy);
+        status = String.format("CORRECTED (%.1f, %.1f in, %d tag%s)", lastDx, lastDy,
+                fewestTags, fewestTags == 1 ? "" : "s");
     }
 
     /** Adds the camera status lines to telemetry (the caller calls telemetry.update()). */
@@ -200,36 +245,34 @@ public class BiobuzzRelocalizer {
         if (vision != null) {
             telemetry.addData("Camera State / Tags", "%s / %s", vision.cameraState(), vision.seenIds());
         }
-        telemetry.addData("Last Correction", "%.1f, %.1f in", lastDx, lastDy);
+        telemetry.addData("Last Correction", "%.1f, %.1f in (%d tags learned)",
+                lastDx, lastDy, BiobuzzTagMap.count());
     }
 
     // =========================================================
-    //  TAG TABLE AND GEOMETRY
+    //  TAG SETS AND GEOMETRY
     // =========================================================
 
-    /** True if this tag is one of the goal tags and its field position has been entered. */
-    public static boolean tagKnown(int id) {
-        for (int i = 0; i < BiobuzzConstants.CAM_TAG_IDS.length; i++) {
-            if (BiobuzzConstants.CAM_TAG_IDS[i] == id) {
-                return !Double.isNaN(BiobuzzConstants.CAM_TAG_X[i])
-                        && !Double.isNaN(BiobuzzConstants.CAM_TAG_Y[i]);
-            }
+    /** The tag IDs on the hive for a shooting side, for the current alliance. SIDE_ANY gives both hives. */
+    public static int[] idsForSide(int side) {
+        int[] left = BiobuzzConstants.ALLIANCE_IS_RED
+                ? BiobuzzConstants.CAM_RED_LEFT_TAGS : BiobuzzConstants.CAM_BLUE_LEFT_TAGS;
+        int[] right = BiobuzzConstants.ALLIANCE_IS_RED
+                ? BiobuzzConstants.CAM_RED_RIGHT_TAGS : BiobuzzConstants.CAM_BLUE_RIGHT_TAGS;
+        if (side == SIDE_LEFT) return left;
+        if (side == SIDE_RIGHT) return right;
+
+        int[] both = new int[left.length + right.length];
+        System.arraycopy(left, 0, both, 0, left.length);
+        System.arraycopy(right, 0, both, left.length, right.length);
+        return both;
+    }
+
+    public static boolean contains(int[] ids, int id) {
+        for (int candidate : ids) {
+            if (candidate == id) return true;
         }
         return false;
-    }
-
-    public static double tagX(int id) {
-        for (int i = 0; i < BiobuzzConstants.CAM_TAG_IDS.length; i++) {
-            if (BiobuzzConstants.CAM_TAG_IDS[i] == id) return BiobuzzConstants.CAM_TAG_X[i];
-        }
-        return Double.NaN;
-    }
-
-    public static double tagY(int id) {
-        for (int i = 0; i < BiobuzzConstants.CAM_TAG_IDS.length; i++) {
-            if (BiobuzzConstants.CAM_TAG_IDS[i] == id) return BiobuzzConstants.CAM_TAG_Y[i];
-        }
-        return Double.NaN;
     }
 
     /**

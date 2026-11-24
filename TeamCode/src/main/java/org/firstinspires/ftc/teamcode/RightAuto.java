@@ -26,14 +26,17 @@ public class RightAuto extends BiobuzzAutoBase {
      */
     private static final double END_TIMEOUT_S = 5.0;
 
-    @Override protected double getStartX() { return 59.5; }
-    @Override protected double getStartY() { return -14.5; }
-    @Override protected double getStartHeading() { return 90.0; }
+    @Override protected double getStartX() { return BiobuzzConstants.START_RIGHT_X; }
+    @Override protected double getStartY() { return BiobuzzConstants.START_RIGHT_Y; }
+    @Override protected double getStartHeading() { return BiobuzzConstants.START_RIGHT_HEADING; }
 
     @Override protected double getShotX() { return 46.0; }
     @Override protected double getShotY() { return -14.5; }
 
     @Override protected BiobuzzAutoDrive.MoveSpeed getMoveSpeed() { return SPEED; }
+
+    /** The opening shot goes to the right hive, so the camera uses the right hive's tags. */
+    @Override protected int getCameraSide() { return BiobuzzRelocalizer.SIDE_RIGHT; }
 
     @Override
     protected void runRoute() {

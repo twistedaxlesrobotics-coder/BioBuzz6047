@@ -127,7 +127,9 @@ public class BiobuzzFieldDriveTeleOp extends LinearOpMode {
                 boolean gateOpen = gamepad1.right_trigger > BiobuzzConstants.GATE_TRIGGER_THRESHOLD;
                 if (relocalizer != null) {
                     if (gateOpen && !prevGateOpen) {
-                        relocalizer.request(BiobuzzConstants.CAM_WINDOW_S);
+                        // The bumper being held says which hive we are shooting at
+                        relocalizer.request(BiobuzzConstants.CAM_WINDOW_S,
+                                BiobuzzRelocalizer.sideFromBumper(assistSelection));
                     }
                     relocalizer.update();
                 }

@@ -8,6 +8,7 @@ import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.controls.ExposureControl;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.controls.GainControl;
 import org.firstinspires.ftc.vision.VisionPortal;
+import org.firstinspires.ftc.vision.apriltag.AprilTagClusterDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 import org.firstinspires.ftc.vision.apriltag.AprilTagSingleDetection;
@@ -129,6 +130,12 @@ public class BiobuzzVision {
             if (detection instanceof AprilTagSingleDetection) {
                 if (sb.length() > 0) sb.append(", ");
                 sb.append(((AprilTagSingleDetection) detection).id);
+            } else if (detection instanceof AprilTagClusterDetection) {
+                // A group of tags the SDK reports as one object (not used for the correction)
+                AprilTagClusterDetection cluster = (AprilTagClusterDetection) detection;
+                if (sb.length() > 0) sb.append(", ");
+                sb.append("cluster");
+                if (cluster.metadata != null) sb.append(' ').append(cluster.metadata.name);
             }
         }
         return sb.length() == 0 ? "none" : sb.toString();
