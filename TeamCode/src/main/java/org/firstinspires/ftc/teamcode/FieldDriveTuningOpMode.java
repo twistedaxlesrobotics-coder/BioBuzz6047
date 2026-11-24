@@ -35,7 +35,9 @@ public class FieldDriveTuningOpMode extends LinearOpMode {
             "FD_ACCEL_RATE",
             "FD_DECEL_RATE",
             "FD_RATE_FILTER",
-            "FD_ARCADE_MAX_POWER"
+            "FD_ARCADE_MAX_POWER",
+            "FD_TURN_MAX_AT_SPEED",
+            "FD_WHEEL_RAMP_RATE"
     };
 
     private static final double[] STEPS = {
@@ -53,7 +55,9 @@ public class FieldDriveTuningOpMode extends LinearOpMode {
             0.25,    // accel rate
             0.25,    // decel rate
             0.05,    // rate filter
-            0.05     // heading + drive top power
+            0.05,    // heading + drive top power
+            0.05,    // turn max power at speed
+            1.0      // wheel ramp rate
     };
 
     BiobuzzHardware robot = new BiobuzzHardware();
@@ -211,7 +215,9 @@ public class FieldDriveTuningOpMode extends LinearOpMode {
             case 11: return BiobuzzConstants.FD_ACCEL_RATE;
             case 12: return BiobuzzConstants.FD_DECEL_RATE;
             case 13: return BiobuzzConstants.FD_RATE_FILTER;
-            default: return BiobuzzConstants.FD_ARCADE_MAX_POWER;
+            case 14: return BiobuzzConstants.FD_ARCADE_MAX_POWER;
+            case 15: return BiobuzzConstants.FD_TURN_MAX_AT_SPEED;
+            default: return BiobuzzConstants.FD_WHEEL_RAMP_RATE;
         }
     }
 
@@ -231,7 +237,9 @@ public class FieldDriveTuningOpMode extends LinearOpMode {
             case 11: BiobuzzConstants.FD_ACCEL_RATE = value; break;
             case 12: BiobuzzConstants.FD_DECEL_RATE = value; break;
             case 13: BiobuzzConstants.FD_RATE_FILTER = value; break;
-            default: BiobuzzConstants.FD_ARCADE_MAX_POWER = value; break;
+            case 14: BiobuzzConstants.FD_ARCADE_MAX_POWER = value; break;
+            case 15: BiobuzzConstants.FD_TURN_MAX_AT_SPEED = value; break;
+            default: BiobuzzConstants.FD_WHEEL_RAMP_RATE = value; break;
         }
     }
 }

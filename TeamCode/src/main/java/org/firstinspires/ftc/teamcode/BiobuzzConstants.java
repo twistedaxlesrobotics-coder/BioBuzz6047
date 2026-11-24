@@ -148,6 +148,12 @@ public class BiobuzzConstants {
     public static double FD_TURN_MIN_POWER = 0.08;
 
     /**
+     * Most turn power allowed while driving at full speed. The turn limit blends from
+     * FD_TURN_MAX_POWER (standing still) down to this as the drive power rises to 100%.
+     */
+    public static double FD_TURN_MAX_AT_SPEED = 0.35;
+
+    /**
      * Limits how fast turning power can build up, in power per second (0 = no limit). It only slows
      * the start of a turn; braking is never delayed. Raise it for snappier turns.
      */
@@ -168,6 +174,12 @@ public class BiobuzzConstants {
     /** Forward/back power ramp, in power per second. Deceleration is gentler to stop the rocking. */
     public static double FD_ACCEL_RATE = 3.0;
     public static double FD_DECEL_RATE = 2.0;
+
+    /**
+     * Limits how fast each side's wheel power can change, in power per second (0 = no limit).
+     * It stops an inside wheel from reversing in a snap during a sharp turn.
+     */
+    public static double FD_WHEEL_RAMP_RATE = 8.0;
 
     /** Smoothing for the turn rate worked out from the heading (0 to 1; higher = less smoothing). */
     public static double FD_RATE_FILTER = 0.4;

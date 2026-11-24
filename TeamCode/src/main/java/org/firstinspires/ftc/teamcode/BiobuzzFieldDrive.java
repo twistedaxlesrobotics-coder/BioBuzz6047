@@ -205,7 +205,12 @@ public class BiobuzzFieldDrive {
                 base = Math.signum(headingError) * BiobuzzConstants.FD_TURN_MIN_POWER;
             }
             turn = base - BiobuzzConstants.FD_TURN_KD * turnRateDps;
-            double max = BiobuzzConstants.FD_TURN_MAX_POWER;
+            // Turn less hard while driving fast: the limit blends from the standstill value down
+            // to the at-speed value as the drive power goes from 0 to 100%
+            double speed = Math.min(1.0, Math.abs(drivePower));
+            double max = BiobuzzConstants.FD_TURN_MAX_POWER
+                    + (BiobuzzConstants.FD_TURN_MAX_AT_SPEED - BiobuzzConstants.FD_TURN_MAX_POWER) * speed;
+            max = Math.max(0.0, max);
             turn = Math.max(-max, Math.min(max, turn));
         }
 
@@ -225,6 +230,13 @@ public class BiobuzzFieldDrive {
         if (biggest > 1.0) {
             left /= biggest;
             right /= biggest;
+        }
+        // Limit how fast each side's power can change, so an inside wheel cannot reverse in a snap.
+        // leftPower and rightPower still hold what was sent last loop.
+        double wheelRate = BiobuzzConstants.FD_WHEEL_RAMP_RATE;
+        if (wheelRate > 0) {
+            left = BiobuzzConstants.slew(leftPower, left, wheelRate * dt);
+            right = BiobuzzConstants.slew(rightPower, right, wheelRate * dt);
         }
         leftPower = left;
         rightPower = right;
